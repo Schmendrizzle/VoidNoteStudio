@@ -1,0 +1,14 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="VoidNote.App.App"
+             RequestedThemeVariant="Default">
+  <Application.Resources>
+    <x:String x:Key="AppName">VoidNote Studio</x:String>
+    <x:String x:Key="FoundationHeading">Foundation ready</x:String>
+    <x:String x:Key="FoundationDescription">The project model, timeline, settings, logging, and undo/redo services are initialized.</x:String>
+    <x:String x:Key="MilestoneLabel">Milestone A</x:String>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+</Application>
