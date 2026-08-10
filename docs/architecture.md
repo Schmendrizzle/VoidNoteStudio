@@ -1,8 +1,8 @@
-# VoidNote Studio – Architekturstand Milestone E
+# VoidNote Studio – Architekturstand Milestone F
 
 ## Geltungsbereich
 
-Dieses Dokument beschreibt die implementierte Architektur nach **Milestone E – GameBridge**. Foundation, MIDI Core, Shawzin Codec, Composer/Arranger und die optionale, gekapselte Ingame-Wiedergabe sind enthalten. Multi-Shawzin, Audio Lab, Mandachord und Creator Mode bleiben späteren Milestones vorbehalten.
+Dieses Dokument beschreibt die implementierte Architektur nach **Milestone F – Multi-Shawzin**. Foundation, MIDI Core, Shawzin Codec, Composer/Arranger, die optionale gekapselte Ingame-Wiedergabe und Multi-Shawzin-Ensembles sind enthalten. Audio Lab, Mandachord und der spätere Take Manager bleiben späteren Milestones vorbehalten.
 
 ## Technische Basis
 
@@ -19,12 +19,12 @@ Dieses Dokument beschreibt die implementierte Architektur nach **Milestone E –
 | Projekt | Verantwortung | Direkte Projektabhängigkeiten |
 | --- | --- | --- |
 | `VoidNote.Domain` | Normalisiertes Projekt- und Musikmodell, Master-Timeline, Tempo- und Taktarten-Map, Shawzin-Noten-/Chordmodell und Domain-Invarianten | keine |
-| `VoidNote.Application` | Ports für Settings und Projektpersistenz, Undo/Redo sowie UI-unabhängige Piano-Roll-Projektion | Domain |
+| `VoidNote.Application` | Ports für Settings und Projektpersistenz, Undo/Redo, Piano-Roll-Projektion sowie Shawzin- und Ensemble-Workflows | Domain, MIDI, Shawzin |
 | `VoidNote.Infrastructure` | JSON-Settings, ZIP-basiertes `.vns`-Format, lokale JSON-Logs, Anwendungspfade | Application, Domain |
 | `VoidNote.App` | Avalonia-Host, Composition Root, DI-Registrierung, MVVM-Shell | Application, Infrastructure |
 | `VoidNote.Midi` | Gekapselter SMF-Import/-Export, Playback-Scheduler und Geräteverträge | Domain, DryWetMIDI |
 | `VoidNote.Audio` | reservierte Modulgrenze; keine Audiofunktion implementiert | keine |
-| `VoidNote.Shawzin` | Gekapselter Warframe-Shawzin-Songcode V1: Decoder, Encoder, Validierung, Fehlerdiagnostik und Codec-Fassade | Domain |
+| `VoidNote.Shawzin` | Codec, Mapping, Analyse, Arrangement, Preview sowie UI-unabhängige Multi-Shawzin-Trennung und Ensemble-Wiedergabe | Domain |
 | `VoidNote.Mandachord` | reservierte Modulgrenze; keine Arrangementlogik implementiert | keine |
 | `VoidNote.GameBridge` | Portable Input-Ports, Keybind-Profile, Mapping, Arm/Disarm, Diagnostik sowie getrennte Windows-/Linux-Adapter | Application, Domain, Shawzin |
 | `VoidNote.PluginContracts` | reservierte Assembly-Grenze; kein öffentliches Plugin-System implementiert | keine |
@@ -101,11 +101,19 @@ Der Codec bleibt von MIDI-Zuordnung, Skalenwahl, Compatibility-Bewertung und Wie
 
 Die Bridge ist standardmäßig disarmed. Profilvalidierung, Fokusprüfung und Capability-Prüfung erfolgen vor realem Input; Stop, Fehler, Emergency Stop und Shutdown lösen `ReleaseAllAsync` aus und disarmen. Profile werden in einer atomar geschriebenen, versionierten lokalen JSON-Datei gespeichert. Details stehen in `docs/gamebridge.md`.
 
+## Multi-Shawzin und Ensemble
+
+`IMultiShawzinSplitter` arbeitet ausschließlich auf normalisierten `MidiTrack`-/`MusicalEvent`-Daten. Er kennt weder DryWetMIDI, Avalonia, GameBridge, Audio noch Betriebssystemeingaben. `VoiceSalienceAnalyzer` liefert deterministische Melody- und Bass-Scores; der Splitter kombiniert sie je Preset mit Register, zeitlicher und melodischer Kontinuität, Überlappung, Dauer, Velocity, Dichte und einer weichen Balance-Komponente. Jede Entscheidung landet in einem `MultiShawzinSplitReport`.
+
+`ShawzinEnsemble` hält eine Referenz auf genau eine `ProjectTimeline`. Seine `ShawzinEnsembleTrack`-Einträge besitzen unabhängige Instrument-, Skalen-, Transpositions-, Analyse-, Arrangement-, Mute- und Solo-Zustände. `ShawzinEnsembleArranger` verwendet dafür die bestehenden Analyzer und den bestehenden `IShawzinArranger`; es gibt keine zweite Mapping- oder Quantisierungsimplementierung.
+
+`ShawzinEnsemblePlaybackEngine` führt alle hörbaren Trackevents gegen einen einzigen Scheduler-Anker zusammen. `SyntheticShawzinEnsemblePreviewRenderer` erzeugt einen synthetischen Stereo-WAV-Mix ohne Warframe-Audiodateien. `EnsembleCodeExporter` ruft für jede Spur den bestehenden Encoder separat auf. Manuelle Notenverschiebungen leben in Application, verwenden den vorhandenen Undo-/Redo-Stack und berechnen ausschließlich Quell- und Zielspur neu. Details und Metriken stehen in `docs/multi-shawzin.md`.
+
 ## Persistenz und Foundation-Dienste
 
 Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `project.json`; Settings und Projekte werden atomar geschrieben; Logging bleibt lokal und ohne Telemetrie; Undo/Redo bleibt UI-unabhängig. Ältere Version-1-Projekte ohne Taktarten-Map erhalten beim Laden die Default-Taktart 4/4.
 
-## Bewusst offene Punkte nach Milestone E
+## Bewusst offene Punkte nach Milestone F
 
 - MIDI-Kanäle, Program Changes, Controller, Marker und SysEx sind noch nicht Teil des normalisierten Domain-Modells.
 - SMPTE-Time-Division wird abgelehnt; der MIDI Core verwendet PPQ.
@@ -120,4 +128,7 @@ Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `p
 - Die minimale UI rendert eine synthetische WAV-Vorschau zum Speichern. Ein plattformübergreifender Live-Audio-Geräteadapter ist noch nicht enthalten; virtuelle Event-Wiedergabe und Preview-Rendering sind vollständig gekapselt.
 - Ein systemweiter Emergency-Stop-Hotkey ist noch nicht implementiert; der jederzeit sichtbare UI-Emergency-Stop ist vorhanden.
 - Wayland wird für reale Eingabesimulation bewusst als nicht verfügbar gemeldet.
-- Multi-Shawzin-Aufteilung bleibt Milestone F.
+- Die Voice-Separation ist bewusst heuristisch und deterministisch; sie ist keine musikwissenschaftlich perfekte Stimmführungsanalyse.
+- Die minimale Multi-Shawzin-UI ist keine Piano-Roll und bietet noch keine grafische Drag-and-drop-Zuordnung; die zugrunde liegenden Reassignment-Operationen sind vorhanden.
+- Ensemble-Preview wird als synthetischer Stereo-WAV-Mix gerendert; ein plattformübergreifender Live-Audio-Ausgang bleibt offen.
+- GameBridge bleibt unverändert auf einen ausgewählten, bereits arrangierten Ensemble-Track begrenzt.

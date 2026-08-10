@@ -22,6 +22,7 @@ using VoidNote.Shawzin.Arrangement;
 using VoidNote.Shawzin.Codec;
 using VoidNote.Shawzin.Mapping;
 using VoidNote.Shawzin.Preview;
+using VoidNote.Shawzin.Ensemble;
 
 namespace VoidNote.App;
 
@@ -45,6 +46,13 @@ internal static class CompositionRoot
         services.AddSingleton<IShawzinCodeEncoder, WarframeShawzinCodeEncoder>();
         services.AddSingleton<IShawzinPreviewRenderer, SyntheticShawzinPreviewRenderer>();
         services.AddSingleton<IShawzinStudioWorkflow, ShawzinStudioWorkflow>();
+        services.AddSingleton<VoiceSalienceAnalyzer>();
+        services.AddSingleton<IMultiShawzinSplitter, MultiShawzinSplitter>();
+        services.AddSingleton<IShawzinEnsembleArranger, ShawzinEnsembleArranger>();
+        services.AddSingleton<IEnsembleCodeExporter, EnsembleCodeExporter>();
+        services.AddSingleton<IShawzinEnsemblePreviewRenderer, SyntheticShawzinEnsemblePreviewRenderer>();
+        services.AddSingleton<IMultiShawzinWorkflow, MultiShawzinWorkflow>();
+        services.AddSingleton<IEnsembleReassignmentService, EnsembleReassignmentService>();
         services.AddSingleton<IKeybindProfileValidator, KeybindProfileValidator>();
         services.AddSingleton<IKeybindProfileStore, JsonKeybindProfileStore>();
         services.AddSingleton<KeybindProfileService>();

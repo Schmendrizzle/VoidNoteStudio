@@ -10,11 +10,13 @@ using VoidNote.Application.Settings;
 using VoidNote.GameBridge.Playback;
 using VoidNote.GameBridge.Profiles;
 using Microsoft.Extensions.Logging;
+using VoidNote.Shawzin.Ensemble;
 
 namespace VoidNote.App.ViewModels;
 
 /// <summary>Presentation state for the minimal Milestone-D Shawzin Studio.</summary>
-public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, GameBridgePlaybackSession gameBridge,
+public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiShawzinWorkflow multiWorkflow,
+    IShawzinEnsembleArranger ensembleArranger, GameBridgePlaybackSession gameBridge,
     KeybindProfileService profileService, ISettingsStore settingsStore, ILogger<MainWindowViewModel> logger) : INotifyPropertyChanged
 {
     private readonly IShawzinStudioWorkflow _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
@@ -39,12 +41,21 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, GameBri
     private string _fretLeftKey = string.Empty;
     private string _fretMiddleKey = string.Empty;
     private string _fretRightKey = string.Empty;
+    private int _shawzinCount = 2;
+    private MultiShawzinSplitStrategy _splitStrategy = MultiShawzinSplitStrategy.FullEnsemble;
+    private IReadOnlyList<EnsembleTrackViewModel> _ensembleTracks = [];
+    private EnsembleTrackViewModel? _selectedEnsembleTrack;
+    private string _ensembleReport = "Not split";
+    private string _ensembleDetails = string.Empty;
+    private ShawzinEnsemble? _ensemble;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public IReadOnlyList<MidiTrack> Tracks { get; private set; } = [];
     public IReadOnlyList<ShawzinDefinition> Instruments => BuiltInShawzinDefinitions.All;
     public IReadOnlyList<ShawzinScale> Scales { get; } = Enum.GetValues<ShawzinScale>();
     public IReadOnlyList<StrategyChoice> Strategies => StrategyChoice.All;
+    public IReadOnlyList<int> ShawzinCounts { get; } = [2, 3, 4];
+    public IReadOnlyList<MultiShawzinSplitStrategy> SplitStrategies { get; } = Enum.GetValues<MultiShawzinSplitStrategy>();
 
     public MidiTrack? SelectedTrack { get => _selectedTrack; set => Set(ref _selectedTrack, value); }
     public ShawzinDefinition SelectedInstrument { get => _selectedInstrument; set => Set(ref _selectedInstrument, value); }
@@ -71,6 +82,23 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, GameBri
     public string GameBridgeStatus { get => _gameBridgeStatus; private set => Set(ref _gameBridgeStatus, value); }
     public bool IsGameBridgeArmed => gameBridge.ArmState == VoidNote.GameBridge.Safety.GameBridgeArmState.Armed;
     public bool DisclaimerAcknowledged => _settings.GameBridge.DisclaimerAcknowledged;
+    public int ShawzinCount { get => _shawzinCount; set => Set(ref _shawzinCount, value); }
+    public MultiShawzinSplitStrategy SplitStrategy { get => _splitStrategy; set => Set(ref _splitStrategy, value); }
+    public IReadOnlyList<EnsembleTrackViewModel> EnsembleTracks { get => _ensembleTracks; private set { _ensembleTracks = value; OnPropertyChanged(); } }
+    public EnsembleTrackViewModel? SelectedEnsembleTrack
+    {
+        get => _selectedEnsembleTrack;
+        set
+        {
+            if (Set(ref _selectedEnsembleTrack, value) && value?.Model.ShawzinTrack is not null)
+            {
+                _arrangedTrack = value.Model.ShawzinTrack;
+                SongCode = value.Code;
+            }
+        }
+    }
+    public string EnsembleReport { get => _ensembleReport; private set => Set(ref _ensembleReport, value); }
+    public string EnsembleDetails { get => _ensembleDetails; private set => Set(ref _ensembleDetails, value); }
 
     public async Task InitializeAsync(CancellationToken token = default)
     {
@@ -116,6 +144,49 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, GameBri
         Status = result.Arrangement.IsSuccess
             ? $"Arranged {result.Arrangement.Report.OutputNoteCount} notes with {result.Arrangement.Report.Changes.Count} reported changes."
             : $"Arrangement has {result.Arrangement.Report.Changes.Count(value => value.ChangeType == ArrangementChangeType.ConflictUnresolved)} unresolved conflict(s).";
+    }
+
+    public void SplitEnsemble()
+    {
+        if (SelectedTrack is null || _timeline is null) { Status = "Select a MIDI track first."; return; }
+        var result = multiWorkflow.Create([SelectedTrack], _timeline, new MultiShawzinSplitOptions
+        {
+            ShawzinCount = ShawzinCount,
+            Strategy = SplitStrategy,
+        });
+        _ensemble = result.Ensemble;
+        _previewWave = result.Preview.WaveData;
+        var exports = result.Export.Tracks.ToDictionary(value => value.TrackId);
+        EnsembleTracks = result.Ensemble.Tracks.Select(track => new EnsembleTrackViewModel(result.Ensemble, track, ensembleArranger, RefreshEnsemble)
+        {
+            Code = exports[track.Id].Code ?? string.Empty,
+        }).ToArray();
+        SelectedEnsembleTrack = EnsembleTracks.FirstOrDefault();
+        RefreshEnsemble();
+        OnPropertyChanged(nameof(HasPreview));
+        Status = $"Created {EnsembleTracks.Count} independent Shawzin tracks.";
+    }
+
+    private void RefreshEnsemble()
+    {
+        if (_ensemble is null) return;
+        var export = multiWorkflow.Export(_ensemble);
+        var byId = export.Tracks.ToDictionary(value => value.TrackId);
+        foreach (var row in EnsembleTracks)
+        {
+            row.Code = byId[row.Model.Id].Code ?? string.Empty;
+            row.NotifyAnalysisChanged();
+        }
+        _previewWave = multiWorkflow.Preview(_ensemble).WaveData;
+        var metrics = _ensemble.OptimizationReport!;
+        EnsembleReport = $"Source {metrics.SourceNoteCount} · arranged {metrics.ArrangedNoteCount} · loss {metrics.NoteLossPercent}% · " +
+            $"compatibility avg {metrics.AverageCompatibility} / min {metrics.LowestTrackCompatibility} · continuity {metrics.VoiceContinuityScore}% · balance {metrics.BalanceScore}%";
+        EnsembleDetails = string.Join(Environment.NewLine, _ensemble.SplitReport.Assignments.Select(value =>
+            $"{value.SourceTime.Ticks}: pitch {value.SourcePitch} → {value.TargetTrackName} ({value.Confidence:P0}) · {value.Reason}")) +
+            Environment.NewLine + string.Join(Environment.NewLine, _ensemble.SplitReport.LaterArrangementChanges.Select(value =>
+                $"{value.ChangeType}: {value.SourcePitch} → {value.TargetPitch?.ToString() ?? "dropped"} · {value.Reason}"));
+        if (SelectedEnsembleTrack is not null) SongCode = SelectedEnsembleTrack.Code;
+        OnPropertyChanged(nameof(HasPreview));
     }
 
     public async Task ArmAsync(bool acknowledgeRisk, CancellationToken token = default)
@@ -218,6 +289,41 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, GameBri
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+}
+
+/// <summary>Editable presentation wrapper around one independently arranged ensemble track.</summary>
+public sealed class EnsembleTrackViewModel : INotifyPropertyChanged
+{
+    private readonly ShawzinEnsemble _ensemble;
+    private readonly IShawzinEnsembleArranger _arranger;
+    private readonly Action _changed;
+    private string _code = string.Empty;
+
+    public EnsembleTrackViewModel(ShawzinEnsemble ensemble, ShawzinEnsembleTrack model, IShawzinEnsembleArranger arranger, Action changed)
+    { _ensemble = ensemble; Model = model; _arranger = arranger; _changed = changed; }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    public ShawzinEnsembleTrack Model { get; }
+    public IReadOnlyList<ShawzinDefinition> Instruments => BuiltInShawzinDefinitions.All;
+    public IReadOnlyList<ShawzinScale> Scales { get; } = Enum.GetValues<ShawzinScale>();
+    public IReadOnlyList<StrategyChoice> Strategies => StrategyChoice.All;
+    public string DisplayName { get => Model.DisplayName; set { Model.DisplayName = value; Notify(); } }
+    public ShawzinDefinition Instrument { get => Model.Instrument; set { Model.Instrument = value; Recalculate(); } }
+    public ShawzinScale Scale { get => Model.Scale; set { Model.Scale = value; Recalculate(); } }
+    public int Transposition { get => Model.TranspositionSemitones; set { Model.TranspositionSemitones = Math.Clamp(value, -12, 12); Recalculate(); } }
+    public StrategyChoice Strategy
+    {
+        get => Strategies.FirstOrDefault(value => value.Strategies == Model.ArrangementStrategies) ?? Strategies[0];
+        set { Model.ArrangementStrategies = value.Strategies; Recalculate(); }
+    }
+    public bool IsMuted { get => Model.IsMuted; set { Model.IsMuted = value; Notify(); _changed(); } }
+    public bool IsSolo { get => Model.IsSolo; set { Model.IsSolo = value; Notify(); _changed(); } }
+    public int Compatibility => Model.Compatibility?.OverallScore ?? 0;
+    public string Code { get => _code; set { _code = value; Notify(); } }
+    public string Report => Model.ArrangementReport is null ? "No arrangement" : $"{Model.ArrangementReport.OutputNoteCount}/{Model.ArrangementReport.SourceNoteCount} notes; {Model.ArrangementReport.Changes.Count} changes";
+    public void NotifyAnalysisChanged() { Notify(nameof(Compatibility)); Notify(nameof(Report)); }
+    private void Recalculate() { _arranger.RearrangeTrack(_ensemble, Model); Notify(); NotifyAnalysisChanged(); _changed(); }
+    private void Notify([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
 public sealed record StrategyChoice(string Name, ArrangementStrategy Strategies)

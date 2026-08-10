@@ -39,3 +39,9 @@ Alle Kandidaten sind deterministisch nach Pitch, Saite und Fret sortiert. `FindC
 Milestone E ergänzt keine OS-Logik im Shawzin-Modul. `GameBridgePlaybackOutput` lebt ausschließlich in `VoidNote.GameBridge` und hängt sich hinter den bestehenden Playback-Port. Optional meldet es dem Transport einen kleinen `KeyDownLead`; die musikalischen Zielzeiten bleiben absolute Ziele desselben Schedulers. Hold- und Release-Zeiten ändern den nächsten Zielzeitpunkt nicht und können daher keine kumulative Drift erzeugen.
 
 Die physische Eventstruktur wird zentral in eine `ShawzinInputAction` übersetzt. Codec, Arrangement, Instrumentdefinitionen und UI kennen keine nativen Tastenwerte. Keybinds stammen ausschließlich aus einem validierten Benutzerprofil. Sicherheits- und Plattformdetails stehen in `docs/gamebridge.md`.
+
+## Ensembles
+
+Milestone F ergänzt `ShawzinEnsemble` und `ShawzinEnsembleTrack` im Shawzin-Modul. Alle Mitglieder teilen dieselbe Master-Timeline, behalten aber eigene Instrumente, Skalen, Transpositionen, Compatibility Reports, Arrangement Reports, physische `ShawzinTrack`-Ergebnisse sowie Active-/Mute-/Solo-Zustände. Jeder Track bleibt dadurch einzeln analysierbar, arrangierbar, vorhörbar, codierbar und an die unveränderte GameBridge übergebbar.
+
+Die Ensemble-Vorschau mischt ausschließlich synthetisch erzeugte Töne. Ein leichtes deterministisches Panorama und eine kleine Klangfarbenvariation aus dem `ShawzinSoundProfile` verbessern die Unterscheidbarkeit; Warframe-Audiodateien werden weder eingebettet noch extrahiert.

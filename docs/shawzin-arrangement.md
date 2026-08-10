@@ -61,10 +61,15 @@ Jeder Eintrag enthält Quell-ID, Quell- und Zielpitch, ursprünglichen und neuen
 
 Ausgabe-IDs werden stabil aus Track-ID, Quell-IDs, Zieltimestamp und Diskriminator abgeleitet. Gleicher Input plus gleiche Optionen erzeugt damit dasselbe Arrangement und denselben Songcode.
 
+## Multi-Shawzin-Anordnung
+
+Vor dem bestehenden Einzeltrack-Arranger kann `IMultiShawzinSplitter` polyphone normalisierte Musik in zwei, drei, vier oder eine höhere benutzerdefinierte Stimmenzahl zerlegen. Die Split-Stufe verändert keine Pitches und quantisiert kein Timing. Danach erhält jede Stimme ihre eigene Skalenanalyse, Transpositionsrangliste, Compatibility-Bewertung und einen normalen `IShawzinArranger`-Durchlauf. Arrangement-Änderungen bleiben in den bereits definierten `ArrangementReport`-Einträgen nachvollziehbar und werden im Ensemble-Optimierungsbericht aggregiert.
+
+Die bisherige `PreserveMelody`-Reduktion im Einzeltrack-Arranger bleibt kompatibel. Die genauere Melody-Heuristik des Splitters bewertet relative Höhe (34 %), Velocity (22 %), Dauer (16 %), Sprung-/Zeitkontinuität (20 %) und lokale Dichte (8 %). Bass-Salienz verwendet tiefes Register (42 %), Dauer (22 %), melodische Kontinuität (22 %) und rhythmische Stabilität (14 %). Details stehen in `docs/multi-shawzin.md`.
+
 ## Bekannte Einschränkungen
 
 - Notendauern und Velocity beeinflussen den Recorded-Song-V1-Code nicht; sie bleiben nur im normalisierten Ausgabetrack erhalten.
-- Melody-Erkennung verwendet derzeit eine deterministische Höhen-/Velocity-Heuristik, keine komplexe Stimmenanalyse.
+- Melody- und Bass-Erkennung bleiben deterministische Heuristiken und keine AI- oder Partitursemantik.
 - Arpeggiation verteilt nur vorwärts und erzeugt keine rhythmische Neuinterpretation.
-- Es gibt keine Multi-Shawzin-Aufteilung; diese gehört zu Milestone F.
-- Es gibt keine GameBridge oder Betriebssystem-Eingabesimulation.
+- Manuelle Reassignment-Datenoperationen sind vorhanden; eine grafische Piano-Roll-Zuordnung bleibt späterer UI-Arbeit vorbehalten.

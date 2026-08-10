@@ -4,6 +4,7 @@
         xmlns:projects="using:VoidNote.Domain.Projects"
         xmlns:shawzin="using:VoidNote.Domain.Shawzin"
         xmlns:profiles="using:VoidNote.GameBridge.Profiles"
+        xmlns:ensemble="using:VoidNote.Shawzin.Ensemble"
         x:Class="VoidNote.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{DynamicResource AppName}"
@@ -43,6 +44,16 @@
             <Button Grid.Column="1" Content="Arrange" Click="Arrange_Click" />
           </Grid>
           <Button Content="Save synthetic WAV preview…" IsEnabled="{Binding HasPreview}" Click="SavePreview_Click" />
+          <Border Padding="12" Margin="0,12,0,0" BorderThickness="1" BorderBrush="{DynamicResource SystemAccentColor}">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Multi-Shawzin" FontSize="18" FontWeight="SemiBold" />
+              <TextBlock Text="Number of Shawzins" />
+              <ComboBox ItemsSource="{Binding ShawzinCounts}" SelectedItem="{Binding ShawzinCount}" />
+              <TextBlock Text="Split strategy" />
+              <ComboBox ItemsSource="{Binding SplitStrategies}" SelectedItem="{Binding SplitStrategy}" />
+              <Button Content="Split and arrange ensemble" Click="SplitEnsemble_Click" />
+            </StackPanel>
+          </Border>
         </StackPanel>
         <StackPanel Grid.Column="1" Spacing="14">
           <TextBlock Text="Compatibility" FontSize="20" FontWeight="SemiBold" />
@@ -53,6 +64,40 @@
           <TextBox Text="{Binding SongCode}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="180" />
           <Button Content="Copy code" HorizontalAlignment="Left" Click="CopyCode_Click" />
           <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.75" />
+          <TextBlock Text="Ensemble tracks" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding EnsembleReport}" TextWrapping="Wrap" />
+          <Expander Header="Split and arrangement report">
+            <TextBox Text="{Binding EnsembleDetails}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="220" />
+          </Expander>
+          <ListBox ItemsSource="{Binding EnsembleTracks}" SelectedItem="{Binding SelectedEnsembleTrack}" MaxHeight="420">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:EnsembleTrackViewModel">
+                <Border Padding="10" Margin="0,3" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+                  <StackPanel Spacing="6">
+                    <TextBox Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                      <ComboBox ItemsSource="{Binding Instruments}" SelectedItem="{Binding Instrument}">
+                        <ComboBox.ItemTemplate><DataTemplate x:DataType="shawzin:ShawzinDefinition"><TextBlock Text="{Binding DisplayName}" /></DataTemplate></ComboBox.ItemTemplate>
+                      </ComboBox>
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding Scales}" SelectedItem="{Binding Scale}" />
+                    </Grid>
+                    <ComboBox ItemsSource="{Binding Strategies}" SelectedItem="{Binding Strategy}">
+                      <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:StrategyChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Grid ColumnDefinitions="Auto,80,Auto,Auto,*" ColumnSpacing="8">
+                      <TextBlock Text="Transpose" VerticalAlignment="Center" />
+                      <NumericUpDown Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding Transposition}" />
+                      <CheckBox Grid.Column="2" Content="Mute" IsChecked="{Binding IsMuted}" />
+                      <CheckBox Grid.Column="3" Content="Solo" IsChecked="{Binding IsSolo}" />
+                      <TextBlock Grid.Column="4" Text="{Binding Compatibility, StringFormat='Compatibility {0}/100'}" HorizontalAlignment="Right" />
+                    </Grid>
+                    <TextBlock Text="{Binding Report}" />
+                    <TextBox Text="{Binding Code}" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="70" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
           <Border Padding="16" Margin="0,16,0,0" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemAccentColor}">
             <StackPanel Spacing="10">
               <TextBlock Text="Ingame Playback" FontSize="20" FontWeight="SemiBold" />

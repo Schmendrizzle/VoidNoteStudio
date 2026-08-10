@@ -30,6 +30,7 @@ public sealed partial class MainWindow : Window
 
     private void Analyze_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel.Analyze();
     private void Arrange_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel.Arrange();
+    private void SplitEnsemble_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel.SplitEnsemble();
 
     private async void SavePreview_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {

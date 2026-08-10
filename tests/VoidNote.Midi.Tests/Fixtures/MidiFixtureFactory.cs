@@ -25,6 +25,14 @@ internal static class MidiFixtureFactory
             new FixtureNote(0, 480, 67, 100),
         ]));
 
+    public static MemoryStream PolyphonicCreatorFlow() => Create(
+        new FixtureTrack("Piano",
+        [
+            new FixtureNote(0, 480, 48, 90), new FixtureNote(0, 480, 55, 95), new FixtureNote(0, 480, 62, 110),
+            new FixtureNote(480, 480, 50, 90), new FixtureNote(480, 480, 57, 95), new FixtureNote(480, 480, 64, 110),
+            new FixtureNote(960, 480, 52, 90), new FixtureNote(960, 480, 59, 95), new FixtureNote(960, 480, 65, 110),
+        ]));
+
     public static MemoryStream MultipleTracks() => Create(
         new FixtureTrack("Lead", [new FixtureNote(0, 480, 72, 110)]),
         new FixtureTrack("Bass", [new FixtureNote(240, 960, 36, 76)]));

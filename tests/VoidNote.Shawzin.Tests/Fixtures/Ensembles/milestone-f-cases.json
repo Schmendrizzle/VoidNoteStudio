@@ -1,0 +1,12 @@
+[
+  { "name": "simple-two-voices", "shawzins": 2, "strategy": "FullEnsemble", "notes": [[0,48,960],[0,60,480],[960,50,960],[960,62,480]], "expectedCounts": [2,2] },
+  { "name": "melody-and-bass", "shawzins": 2, "strategy": "MelodyBass", "notes": [[0,40,960],[0,67,480],[960,41,960],[960,69,480],[1920,43,960],[1920,71,480]], "expectedCounts": [3,3] },
+  { "name": "triad-progression", "shawzins": 3, "strategy": "MelodyHarmony", "notes": [[0,48,960],[0,55,960],[0,64,960],[960,50,960],[960,57,960],[960,65,960]], "expectedCounts": [2,2,2] },
+  { "name": "four-part-piano", "shawzins": 4, "strategy": "FullEnsemble", "notes": [[0,48,960],[0,55,960],[0,60,960],[0,67,960],[960,50,960],[960,57,960],[960,62,960],[960,69,960]], "expectedCounts": [2,2,2,2] },
+  { "name": "fast-melody-held-chords", "shawzins": 3, "strategy": "MaximumRecognition", "notes": [[0,48,3840],[0,55,3840],[0,72,240],[480,74,240],[960,76,240],[1440,77,240],[1920,79,240]], "expectedTotal": 7 },
+  { "name": "bass-chords-lead", "shawzins": 4, "strategy": "CreatorMultitrack", "notes": [[0,36,960],[0,48,960],[0,55,960],[0,72,480],[960,38,960],[960,50,960],[960,57,960],[960,74,480]], "expectedTotal": 8 },
+  { "name": "overlapping-voices", "shawzins": 3, "strategy": "MinimalNoteLoss", "notes": [[0,48,1920],[240,60,1920],[480,67,1920],[960,50,1920],[1200,62,1920],[1440,69,1920]], "expectedTotal": 6 },
+  { "name": "wide-register", "shawzins": 4, "strategy": "RegisterSplit", "notes": [[0,24,960],[0,48,960],[0,72,960],[0,96,960],[960,26,960],[960,50,960],[960,74,960],[960,98,960]], "expectedCounts": [2,2,2,2] },
+  { "name": "dense-passage", "shawzins": 4, "strategy": "FullEnsemble", "notes": [[0,48,240],[0,52,240],[0,55,240],[0,60,240],[240,50,240],[240,53,240],[240,57,240],[240,62,240],[480,52,240],[480,55,240],[480,59,240],[480,64,240]], "expectedTotal": 12 },
+  { "name": "arrangement-note-loss-required", "shawzins": 2, "strategy": "MaximumRecognition", "notes": [[0,0,240],[0,1,240],[0,2,240],[0,3,240],[0,4,240],[0,123,240],[0,124,240],[0,125,240],[0,126,240],[0,127,240]], "expectedTotal": 10, "expectedArrangementLoss": true }
+]
