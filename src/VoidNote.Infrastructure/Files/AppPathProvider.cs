@@ -24,5 +24,8 @@ public sealed class AppPathProvider : IAppPathProvider
     public string SettingsFilePath => Path.Combine(_rootDirectory, "settings.json");
 
     /// <inheritdoc />
+    public string GameBridgeProfilesFilePath => Path.Combine(_rootDirectory, "gamebridge-profiles.json");
+
+    /// <inheritdoc />
     public string LogDirectory => Path.Combine(_rootDirectory, "logs");
 }

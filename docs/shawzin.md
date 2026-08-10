@@ -33,3 +33,9 @@ Alle Kandidaten sind deterministisch nach Pitch, Saite und Fret sortiert. `FindC
 `ShawzinPlaybackEngine` lädt einen geordneten `ShawzinTrack`. Alle Ziele werden relativ zu einem einzigen Timestamp von `IShawzinPlaybackScheduler` geplant. Ausgabe erfolgt über `IShawzinPlaybackOutput` als Einzelnote, Chord, Stop und Positionsänderung. Damit kann später dieselbe Transportlogik Preview- und GameBridge-Adapter versorgen, ohne selbst OS-Eingaben zu kennen.
 
 `IShawzinPreviewRenderer` ist davon getrennt. Die erste Implementierung erzeugt deterministisch ein rechtlich unproblematisches 16-Bit-Mono-WAV mit synthetischen, abklingenden Sinustönen. Sie enthält und extrahiert keine Warframe-Samples. Die minimale Studio-UI kann dieses WAV speichern; ein plattformübergreifender Live-Audio-Geräteadapter bleibt eine spätere Erweiterung.
+
+## GameBridge-Ausgabe
+
+Milestone E ergänzt keine OS-Logik im Shawzin-Modul. `GameBridgePlaybackOutput` lebt ausschließlich in `VoidNote.GameBridge` und hängt sich hinter den bestehenden Playback-Port. Optional meldet es dem Transport einen kleinen `KeyDownLead`; die musikalischen Zielzeiten bleiben absolute Ziele desselben Schedulers. Hold- und Release-Zeiten ändern den nächsten Zielzeitpunkt nicht und können daher keine kumulative Drift erzeugen.
+
+Die physische Eventstruktur wird zentral in eine `ShawzinInputAction` übersetzt. Codec, Arrangement, Instrumentdefinitionen und UI kennen keine nativen Tastenwerte. Keybinds stammen ausschließlich aus einem validierten Benutzerprofil. Sicherheits- und Plattformdetails stehen in `docs/gamebridge.md`.

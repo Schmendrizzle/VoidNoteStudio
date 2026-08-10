@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using VoidNote.App.ViewModels;
 using VoidNote.App.Views;
+using VoidNote.GameBridge.Playback;
 
 namespace VoidNote.App;
 
@@ -25,6 +26,7 @@ public sealed class App(IServiceProvider services) : Avalonia.Application
             {
                 DataContext = _services.GetRequiredService<MainWindowViewModel>(),
             };
+            desktop.Exit += (_, _) => _services.GetRequiredService<GameBridgePlaybackSession>().StopAsync().GetAwaiter().GetResult();
             _services.GetRequiredService<ILogger<App>>().LogInformation("VoidNote Studio foundation started.");
         }
 

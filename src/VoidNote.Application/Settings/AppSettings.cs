@@ -17,6 +17,9 @@ public sealed record AppSettings
 
     /// <summary>Gets storage settings.</summary>
     public StorageSettings Storage { get; init; } = new();
+
+    /// <summary>Gets local opt-in and timing preferences for the optional GameBridge.</summary>
+    public GameBridgeSettings GameBridge { get; init; } = new();
 }
 
 /// <summary>Contains settings that apply to the complete application.</summary>
@@ -50,3 +53,17 @@ public sealed record StorageSettings
     /// <summary>Gets the optional default project directory.</summary>
     public string? DefaultProjectDirectory { get; init; }
 }
+
+/// <summary>Contains safe defaults for the optional external-input adapter.</summary>
+public sealed record GameBridgeSettings
+{
+    public bool DisclaimerAcknowledged { get; init; }
+    public TargetFocusLossBehavior FocusLossBehavior { get; init; } = TargetFocusLossBehavior.Abort;
+    public string TargetWindowTitle { get; init; } = "Warframe";
+    public int KeyDownLeadMilliseconds { get; init; } = 5;
+    public int HoldDurationMilliseconds { get; init; } = 25;
+    public int ReleaseDelayMilliseconds { get; init; } = 5;
+}
+
+/// <summary>Controls whether loss of the configured target focus aborts real input.</summary>
+public enum TargetFocusLossBehavior { Abort, Ignore }

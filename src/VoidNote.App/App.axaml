@@ -4,7 +4,7 @@
              RequestedThemeVariant="Default">
   <Application.Resources>
     <x:String x:Key="AppName">VoidNote Studio</x:String>
-    <x:String x:Key="MilestoneLabel">Milestone D</x:String>
+    <x:String x:Key="MilestoneLabel">Milestone E</x:String>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />

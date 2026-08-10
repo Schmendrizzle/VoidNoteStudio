@@ -3,6 +3,7 @@
         xmlns:vm="using:VoidNote.App.ViewModels"
         xmlns:projects="using:VoidNote.Domain.Projects"
         xmlns:shawzin="using:VoidNote.Domain.Shawzin"
+        xmlns:profiles="using:VoidNote.GameBridge.Profiles"
         x:Class="VoidNote.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{DynamicResource AppName}"
@@ -52,6 +53,43 @@
           <TextBox Text="{Binding SongCode}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="180" />
           <Button Content="Copy code" HorizontalAlignment="Left" Click="CopyCode_Click" />
           <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.75" />
+          <Border Padding="16" Margin="0,16,0,0" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource SystemAccentColor}">
+            <StackPanel Spacing="10">
+              <TextBlock Text="Ingame Playback" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding GameBridgeAvailability}" TextWrapping="Wrap" />
+              <TextBlock Text="Keybind profile" FontWeight="SemiBold" />
+              <ComboBox ItemsSource="{Binding KeybindProfiles}" SelectedItem="{Binding SelectedKeybindProfile}">
+                <ComboBox.ItemTemplate><DataTemplate x:DataType="profiles:ShawzinKeybindProfile"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBox PlaceholderText="Profile name" Text="{Binding ProfileName}" />
+              <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+                <TextBlock Text="String 1" VerticalAlignment="Center" /><TextBox Grid.Column="1" Text="{Binding String1Key}" />
+                <TextBlock Grid.Column="2" Text="Fret Left" VerticalAlignment="Center" /><TextBox Grid.Column="3" Text="{Binding FretLeftKey}" />
+                <TextBlock Grid.Row="1" Text="String 2" VerticalAlignment="Center" /><TextBox Grid.Row="1" Grid.Column="1" Text="{Binding String2Key}" />
+                <TextBlock Grid.Row="1" Grid.Column="2" Text="Fret Middle" VerticalAlignment="Center" /><TextBox Grid.Row="1" Grid.Column="3" Text="{Binding FretMiddleKey}" />
+                <TextBlock Grid.Row="2" Text="String 3" VerticalAlignment="Center" /><TextBox Grid.Row="2" Grid.Column="1" Text="{Binding String3Key}" />
+                <TextBlock Grid.Row="2" Grid.Column="2" Text="Fret Right" VerticalAlignment="Center" /><TextBox Grid.Row="2" Grid.Column="3" Text="{Binding FretRightKey}" />
+              </Grid>
+              <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                <Button Content="Save profile" Click="SaveProfile_Click" />
+                <Button Grid.Column="1" Content="Duplicate" Click="DuplicateProfile_Click" />
+                <Button Grid.Column="2" Content="Delete" Click="DeleteProfile_Click" />
+              </Grid>
+              <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                <Button Content="Arm" Click="Arm_Click" />
+                <Button Grid.Column="1" Content="Disarm" Click="Disarm_Click" />
+                <Button Grid.Column="2" Content="Dry run" Click="DryRun_Click" />
+              </Grid>
+              <Button Content="Test input (diagnostic only)" Click="TestInput_Click" />
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Content="Start" Click="StartIngame_Click" />
+                <Button Grid.Column="1" Content="Stop" Click="Disarm_Click" />
+              </Grid>
+              <Button Content="EMERGENCY STOP" Background="#B3261E" Foreground="White" Click="EmergencyStop_Click" />
+              <TextBlock Text="Emergency Stop is always available here. Stop/errors/shutdown release all synthetic keys and disarm." TextWrapping="Wrap" />
+              <TextBlock Text="{Binding GameBridgeStatus}" TextWrapping="Wrap" Opacity="0.8" />
+            </StackPanel>
+          </Border>
         </StackPanel>
       </Grid>
     </ScrollViewer>

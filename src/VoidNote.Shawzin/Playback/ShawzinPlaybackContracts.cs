@@ -22,3 +22,9 @@ public interface IShawzinPlaybackOutput
     ValueTask StopAsync(CancellationToken cancellationToken);
     ValueTask PositionChangedAsync(AbsoluteTime position, CancellationToken cancellationToken);
 }
+
+/// <summary>Optionally asks the shared transport to dispatch ahead of the musical strike.</summary>
+public interface IShawzinPlaybackTimingOutput
+{
+    AbsoluteTime KeyDownLead { get; }
+}

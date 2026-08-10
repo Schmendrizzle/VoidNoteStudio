@@ -120,7 +120,9 @@ public sealed class ShawzinPlaybackEngine : IAsyncDisposable
             }
             foreach (var shawzinEvent in due)
             {
-                await _scheduler.WaitUntilAsync(anchor, new AbsoluteTime(shawzinEvent.Position.Seconds - start.Seconds), cancellationToken).ConfigureAwait(false);
+                var lead = (_output as IShawzinPlaybackTimingOutput)?.KeyDownLead.Seconds ?? 0m;
+                var dispatchOffset = Math.Max(0m, shawzinEvent.Position.Seconds - start.Seconds - lead);
+                await _scheduler.WaitUntilAsync(anchor, new AbsoluteTime(dispatchOffset), cancellationToken).ConfigureAwait(false);
                 if (shawzinEvent.Chord.Notes.Count == 1) await _output.PlayNoteAsync(shawzinEvent, cancellationToken).ConfigureAwait(false);
                 else await _output.PlayChordAsync(shawzinEvent, cancellationToken).ConfigureAwait(false);
                 await _output.PositionChangedAsync(shawzinEvent.Position, cancellationToken).ConfigureAwait(false);
@@ -136,8 +138,24 @@ public sealed class ShawzinPlaybackEngine : IAsyncDisposable
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch
+        {
+            try { await _output.StopAsync(CancellationToken.None).ConfigureAwait(false); } catch { }
+            lock (_gate)
+            {
+                _position = AbsoluteTime.Zero;
+                _anchorPosition = AbsoluteTime.Zero;
+                _state = ShawzinPlaybackState.Stopped;
+            }
+            throw;
+        }
     }
 
     private static AbsoluteTime Add(AbsoluteTime left, AbsoluteTime right) => new(left.Seconds + right.Seconds);
-    private static async Task AwaitCancellation(Task task) { try { await task.ConfigureAwait(false); } catch (OperationCanceledException) { } }
+    private static async Task AwaitCancellation(Task task)
+    {
+        try { await task.ConfigureAwait(false); }
+        catch (OperationCanceledException) { }
+        catch { /* The original PlayAsync task remains the authoritative error channel; cleanup is idempotent. */ }
+    }
 }

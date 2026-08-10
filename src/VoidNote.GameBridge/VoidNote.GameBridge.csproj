@@ -1,3 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\VoidNote.Application\VoidNote.Application.csproj" />
+    <ProjectReference Include="..\VoidNote.Domain\VoidNote.Domain.csproj" />
+    <ProjectReference Include="..\VoidNote.Shawzin\VoidNote.Shawzin.csproj" />
+  </ItemGroup>
 </Project>

@@ -10,6 +10,12 @@ using VoidNote.Infrastructure.Files;
 using VoidNote.Infrastructure.Logging;
 using VoidNote.Infrastructure.Projects;
 using VoidNote.Infrastructure.Settings;
+using VoidNote.GameBridge.Abstractions;
+using VoidNote.GameBridge.Mapping;
+using VoidNote.GameBridge.Platform;
+using VoidNote.GameBridge.Playback;
+using VoidNote.GameBridge.Profiles;
+using VoidNote.GameBridge.Safety;
 using VoidNote.Midi;
 using VoidNote.Shawzin.Analysis;
 using VoidNote.Shawzin.Arrangement;
@@ -39,6 +45,14 @@ internal static class CompositionRoot
         services.AddSingleton<IShawzinCodeEncoder, WarframeShawzinCodeEncoder>();
         services.AddSingleton<IShawzinPreviewRenderer, SyntheticShawzinPreviewRenderer>();
         services.AddSingleton<IShawzinStudioWorkflow, ShawzinStudioWorkflow>();
+        services.AddSingleton<IKeybindProfileValidator, KeybindProfileValidator>();
+        services.AddSingleton<IKeybindProfileStore, JsonKeybindProfileStore>();
+        services.AddSingleton<KeybindProfileService>();
+        services.AddSingleton<IShawzinInputMapper, ShawzinInputMapper>();
+        services.AddSingleton<GameBridgeArmController>();
+        services.AddSingleton<IGameInputBridge>(_ => PlatformGameInputBridgeFactory.CreateBridge());
+        services.AddSingleton<IGameTargetFocusService>(_ => PlatformGameInputBridgeFactory.CreateFocusService());
+        services.AddSingleton<GameBridgePlaybackSession>();
         services.AddTransient<MainWindowViewModel>();
         services.AddLogging(builder =>
         {

@@ -1,8 +1,8 @@
-# VoidNote Studio – Architekturstand Milestone C
+# VoidNote Studio – Architekturstand Milestone E
 
 ## Geltungsbereich
 
-Dieses Dokument beschreibt die implementierte Architektur nach **Milestone C – Shawzin Codec**. Foundation, MIDI Core sowie das UI-unabhängige Shawzin-Datenmodell mit Decoder, Encoder, Validierung und Roundtrip-Fixtures sind enthalten. Shawzin-Arrangement/-Playback, Mandachord, Audio-to-MIDI, vollständiges Recording, GameBridge und eine grafische DAW-Oberfläche bleiben ausdrücklich späteren Milestones vorbehalten.
+Dieses Dokument beschreibt die implementierte Architektur nach **Milestone E – GameBridge**. Foundation, MIDI Core, Shawzin Codec, Composer/Arranger und die optionale, gekapselte Ingame-Wiedergabe sind enthalten. Multi-Shawzin, Audio Lab, Mandachord und Creator Mode bleiben späteren Milestones vorbehalten.
 
 ## Technische Basis
 
@@ -26,7 +26,7 @@ Dieses Dokument beschreibt die implementierte Architektur nach **Milestone C –
 | `VoidNote.Audio` | reservierte Modulgrenze; keine Audiofunktion implementiert | keine |
 | `VoidNote.Shawzin` | Gekapselter Warframe-Shawzin-Songcode V1: Decoder, Encoder, Validierung, Fehlerdiagnostik und Codec-Fassade | Domain |
 | `VoidNote.Mandachord` | reservierte Modulgrenze; keine Arrangementlogik implementiert | keine |
-| `VoidNote.GameBridge` | reservierte Modulgrenze; keine Eingabesimulation implementiert | keine |
+| `VoidNote.GameBridge` | Portable Input-Ports, Keybind-Profile, Mapping, Arm/Disarm, Diagnostik sowie getrennte Windows-/Linux-Adapter | Application, Domain, Shawzin |
 | `VoidNote.PluginContracts` | reservierte Assembly-Grenze; kein öffentliches Plugin-System implementiert | keine |
 
 ## Abhängigkeitsrichtung
@@ -95,11 +95,17 @@ Der Codec bleibt von MIDI-Zuordnung, Skalenwahl, Compatibility-Bewertung und Wie
 
 `PianoRollViewModel` in Application ist eine schreibgeschützte, Avalonia-unabhängige Projektion eines normalisierten MIDI-Tracks. Sie stellt Ticks, Beats, musikalische und absolute Positionen für eine spätere Oberfläche bereit. Editierwerkzeuge, Quantisierung und aufwendige Darstellung sind noch nicht implementiert.
 
+## GameBridge
+
+`GameBridgePlaybackOutput` implementiert den bestehenden `IShawzinPlaybackOutput`-Port. Die Kette lautet `ShawzinPlaybackEngine → GameBridgePlaybackOutput → ShawzinInputMapper → IGameInputBridge`. Der Shawzin-Scheduler bleibt die einzige Zeitquelle und plant weiter gegen einen gemeinsamen monotonic-clock-Anker. Die Domain- und Shawzin-Assemblies referenzieren weder Win32 noch X11.
+
+Die Bridge ist standardmäßig disarmed. Profilvalidierung, Fokusprüfung und Capability-Prüfung erfolgen vor realem Input; Stop, Fehler, Emergency Stop und Shutdown lösen `ReleaseAllAsync` aus und disarmen. Profile werden in einer atomar geschriebenen, versionierten lokalen JSON-Datei gespeichert. Details stehen in `docs/gamebridge.md`.
+
 ## Persistenz und Foundation-Dienste
 
 Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `project.json`; Settings und Projekte werden atomar geschrieben; Logging bleibt lokal und ohne Telemetrie; Undo/Redo bleibt UI-unabhängig. Ältere Version-1-Projekte ohne Taktarten-Map erhalten beim Laden die Default-Taktart 4/4.
 
-## Bewusst offene Punkte nach Milestone D
+## Bewusst offene Punkte nach Milestone E
 
 - MIDI-Kanäle, Program Changes, Controller, Marker und SysEx sind noch nicht Teil des normalisierten Domain-Modells.
 - SMPTE-Time-Division wird abgelehnt; der MIDI Core verwendet PPQ.
@@ -112,4 +118,6 @@ Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `p
 - Slow Playback ist nicht im Songcode markiert und wird deshalb nicht als implizite zweite Codec-Zeitbasis behandelt.
 - Das eingebaute Standard-Spielprofil ist eine dokumentierte, erweiterbare VoidNote-Projektion; die Community-/Spielvalidierung weiterer Tunings und Instrumentvarianten bleibt offen.
 - Die minimale UI rendert eine synthetische WAV-Vorschau zum Speichern. Ein plattformübergreifender Live-Audio-Geräteadapter ist noch nicht enthalten; virtuelle Event-Wiedergabe und Preview-Rendering sind vollständig gekapselt.
-- Keine GameBridge, OS-Eingabesimulation, globalen Hotkeys oder Multi-Shawzin-Aufteilung sind implementiert.
+- Ein systemweiter Emergency-Stop-Hotkey ist noch nicht implementiert; der jederzeit sichtbare UI-Emergency-Stop ist vorhanden.
+- Wayland wird für reale Eingabesimulation bewusst als nicht verfügbar gemeldet.
+- Multi-Shawzin-Aufteilung bleibt Milestone F.
