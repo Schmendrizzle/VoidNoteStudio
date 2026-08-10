@@ -33,4 +33,15 @@ public sealed class VoidNoteProjectTests
         Assert.Throws<ArgumentException>(() =>
             new ProjectFileReference(Path.GetFullPath("song.wav"), ProjectPathKind.Relative));
     }
+
+    [Fact]
+    public void ProjectFileReference_AcceptsPlatformAbsolutePath()
+    {
+        var absolutePath = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "VoidNote.Tests", "song.wav"));
+
+        var reference = new ProjectFileReference(absolutePath, ProjectPathKind.Absolute);
+
+        Assert.Equal(ProjectPathKind.Absolute, reference.Kind);
+        Assert.True(Path.IsPathRooted(reference.Path));
+    }
 }

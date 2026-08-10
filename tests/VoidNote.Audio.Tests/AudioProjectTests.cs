@@ -28,17 +28,17 @@ public sealed class AudioProjectTests
     [Fact]
     public void TrackOperations_AreUndoable()
     {
-        var (project, _, track) = Model(ProjectPathKind.Absolute, "C:/audio.wav"); var history = new UndoRedoService();
+        var (project, _, track) = Model(ProjectPathKind.Absolute, AbsoluteTestPath("audio.wav")); var history = new UndoRedoService();
         history.Execute(new SetAudioTrackValueCommand<decimal>("Gain", value => track.Gain = value, 1, 0.25m)); Assert.Equal(0.25m, track.Gain); Assert.True(history.Undo()); Assert.Equal(1, track.Gain); Assert.True(history.Redo());
         history.Execute(new RemoveAudioTrackCommand(project, track)); Assert.Empty(project.AudioTracks); Assert.True(history.Undo()); Assert.Single(project.AudioTracks);
     }
 
     [Theory]
     [InlineData(ProjectPathKind.Relative, "audio/source.wav")]
-    [InlineData(ProjectPathKind.Absolute, "C:/music/source.wav")]
+    [InlineData(ProjectPathKind.Absolute, "music/source.wav")]
     public async Task ExternalAudioReferences_RoundTrip(ProjectPathKind kind, string reference)
     {
-        if (!OperatingSystem.IsWindows() && kind == ProjectPathKind.Absolute) reference = "/music/source.wav";
+        if (kind == ProjectPathKind.Absolute) reference = AbsoluteTestPath("music", "source.wav");
         using var fixtures = new AudioFixtureDirectory(); var path = System.IO.Path.Combine(fixtures.Path, "project.vns"); var (project, source, _) = Model(kind, reference);
         await new VnsProjectStore().SaveAsync(project, path); var loaded = await new VnsProjectStore().LoadAsync(path); var restored = Assert.Single(loaded.AudioSources);
         Assert.Equal(source.Id, restored.Id); Assert.Equal(kind, restored.File!.Kind); Assert.Equal(source.Format.Codec, restored.Format.Codec); Assert.Equal(source.Format.SampleRate, restored.Format.SampleRate);
@@ -73,4 +73,7 @@ public sealed class AudioProjectTests
         var source = new AudioSource { Name = "Source", SourcePath = physicalPath ?? reference, File = new(reference, kind), Format = new() { Container = "WAV", Codec = "PCM", SampleRate = 8000, ChannelCount = 1, BitDepth = 16, Duration = new(1), Channels = [new(0, "Mono")] } };
         var track = new AudioTrack { Name = "Audio", Clips = [new() { Name = "Clip", SourceId = source.Id, Duration = new(1) }] }; var project = new VoidNoteProject { AudioSources = [source], AudioTracks = [track] }; project.Validate(); return (project, source, track);
     }
+
+    private static string AbsoluteTestPath(params string[] segments) =>
+        Path.GetFullPath(Path.Combine([Path.GetTempPath(), .. segments]));
 }

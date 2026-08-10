@@ -152,7 +152,7 @@ public sealed class VnsProjectStoreTests
     [Theory]
     [InlineData("../escape.wav")]
     [InlineData("/absolute.wav")]
-    [InlineData("C:/absolute.wav")]
+    [InlineData("drive:/absolute.wav")]
     public async Task LoadAsync_RejectsUnsafeEmbeddedArchivePaths(string unsafePath)
     {
         using var directory = new TemporaryDirectory();
