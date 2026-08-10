@@ -1,4 +1,5 @@
 using VoidNote.Domain.Music;
+using VoidNote.Domain.Shawzin;
 
 namespace VoidNote.Domain.Projects;
 

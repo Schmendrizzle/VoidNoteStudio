@@ -39,9 +39,6 @@ public abstract class ProjectTrack : ProjectItem
 /// <summary>Represents the foundation of a MIDI track; import and export are not implemented.</summary>
 public sealed class MidiTrack : ProjectTrack;
 
-/// <summary>Represents the foundation of a Shawzin track; codec and playback are not implemented.</summary>
-public sealed class ShawzinTrack : ProjectTrack;
-
 /// <summary>Represents the foundation of a Mandachord track; arrangement is not implemented.</summary>
 public sealed class MandachordTrack : ProjectTrack;
 

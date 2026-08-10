@@ -1,9 +1,12 @@
+using System.Text.Json.Serialization;
+
 namespace VoidNote.Domain.Music;
 
 /// <summary>Represents an absolute timeline value as decimal seconds.</summary>
 public readonly record struct AbsoluteTime
 {
     /// <summary>Creates an absolute time value.</summary>
+    [JsonConstructor]
     public AbsoluteTime(decimal seconds)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(seconds);
