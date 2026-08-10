@@ -17,16 +17,15 @@ Screenshots will be added after the RC visual review. The current RC contains Pr
 
 ## Windows
 
-Use the `win-x64` portable ZIP, extract it to a writable folder and run `VoidNote.App.exe`. The RC package is framework-dependent and requires the [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0). Unsigned builds can trigger Microsoft SmartScreen; review the source and package contents before choosing to run them.
+Use the `win-x64` portable ZIP, extract it to a writable folder and run `VoidNote.App.exe`. The official RC package includes the required .NET 10 runtime; no separate .NET installation is required. Unsigned builds can trigger Microsoft SmartScreen; review the source and package contents before choosing to run them.
 
 ## Linux
 
-Use the `linux-x64` tarball, extract it, mark `VoidNote.App` executable if needed, and run it from a desktop session with the .NET 10 runtime installed. Composition, preview, conversion and export work under X11 and Wayland. Optional real GameBridge input is X11-only; Wayland intentionally reports it unavailable.
+Use the `linux-x64` tarball, extract it and run `VoidNote.App` from a desktop session. The executable bit and required .NET 10 runtime files are included; no separate .NET installation is required. Composition, preview, conversion and export work under X11 and Wayland. Optional real GameBridge input is X11-only; Wayland intentionally reports it unavailable.
 
 ## Requirements
 
 - Windows x64 or desktop Linux x64.
-- .NET 10 runtime for the framework-dependent portable package.
 - FFmpeg/ffprobe/ffplay only for MP3, FLAC and live FFplay output.
 - Python 3.10+ only for optional AI features.
 

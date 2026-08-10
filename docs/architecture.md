@@ -150,7 +150,7 @@ Creator Sessions sind Teil der Projektwurzel. Session, Takes, Sections, Statushi
 
 ## Release-Readiness-Dienste
 
-`IProjectRecoveryService` liegt als Application-Port vor; `ProjectRecoveryService` schreibt `.vns`-Snapshots samt minimaler Metadaten ausschließlich in den VoidNote-Recovery-Bereich. Es ersetzt nie die reguläre Projektdatei. Startup-Erkennung vergleicht Autosave- und Originalzeit, Recovery öffnet den Snapshot als unsaved state, Discard löscht nur owned Recovery-Dateien.
+`IProjectRecoveryService` liegt als Application-Port vor; `ProjectRecoveryService` schreibt `.vns`-Snapshots samt minimaler Metadaten ausschließlich in den VoidNote-Recovery-Bereich. Es ersetzt nie die reguläre Projektdatei. Autosave- und Originalzeit werden als absolute `DateTimeOffset`-/UTC-Zeitpunkte verglichen; nur ein strikt neuerer Snapshot ist recoverable. Die Zuordnung wird über Projekt-ID und normalisierten Pfad validiert. Bei Save As werden sicher supersedierte Snapshots derselben laufenden Sitzung entfernt, und ein sauberer Shutdown entfernt nur nachweislich obsolete Session-Snapshots. Legacy-Snapshots ohne Originalpfad werden ausschließlich bei genau einer Projekt-ID-Übereinstimmung mit einem Recent Project zugeordnet. Recovery öffnet den Snapshot als unsaved state, Discard löscht nur owned Recovery-Dateien.
 
 Settings Schema 2 ergänzt Autosave, First Run, bounded Recent Projects und Backup-Retention. `JsonSettingsStore` migriert Schema 1, normalisiert Grenzen und fällt bei syntaktisch ungültigen Einstellungen auf sichere Defaults zurück. Sprache und Theme sind Domain-/Application-Enums; Avalonia lädt Deutsch/Englisch als ResourceDictionary und setzt System/Light/Dark beim Start.
 
@@ -158,7 +158,7 @@ Settings Schema 2 ergänzt Autosave, First Run, bounded Recent Projects und Back
 
 Der `.vns`-Adapter validiert vor Manifestdeserialisierung Entryanzahl, eindeutige relative Pfade, Symlinkfreiheit und gesamte Expanded Size. Embedded Assets besitzen Einzelgrößen-/Kompressionsgrenzen und einen limitierenden Kopierpfad zu GUID-basierten Zielen. Diese Härtung bleibt vollständig in Infrastructure; Domain und Formatmodell kennen keine ZIP-APIs.
 
-Shutdown bricht Background Jobs ab, stoppt Audio und GameBridge/held keys, wartet auf Autosave, speichert Settings und räumt markierte AI-Tempordner best-effort auf. Ein Cleanupfehler wird lokal geloggt und verhindert die übrigen Schritte nicht.
+Shutdown bricht Background Jobs ab, stoppt Audio und GameBridge/held keys, wartet auf Autosave, schließt den Recovery-Lifecycle sauber ab, speichert Settings und räumt markierte AI-Tempordner best-effort auf. Ein Cleanupfehler wird lokal geloggt und verhindert die übrigen Schritte nicht.
 
 ## Bewusst offene Punkte nach Milestone J
 

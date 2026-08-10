@@ -62,6 +62,8 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     private IReadOnlyList<RecentProjectViewModel> _recentProjects = [];
     private RecentProjectViewModel? _selectedRecentProject;
     private RecoveryCandidate? _pendingRecovery;
+    private IReadOnlyList<RecoveryCandidate> _pendingRecoveries = [];
+    private RecoveryCandidate? _openedRecovery;
     private string _diagnosticsText = "Diagnostics have not been run.";
     private CancellationTokenSource? _autosaveCancellation;
     private Task _autosaveLoop = Task.CompletedTask;
@@ -92,8 +94,18 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     public string ActiveJobs => jobs.Jobs.Count(value => value.State is BackgroundJobState.Queued or BackgroundJobState.Running) is var count && count > 0 ? $"{count} background job(s)" : "No background jobs";
     public IReadOnlyList<RecentProjectViewModel> RecentProjects { get => _recentProjects; private set => Set(ref _recentProjects, value); }
     public RecentProjectViewModel? SelectedRecentProject { get => _selectedRecentProject; set => Set(ref _selectedRecentProject, value); }
-    public RecoveryCandidate? PendingRecovery { get => _pendingRecovery; private set { if (Set(ref _pendingRecovery, value)) OnPropertyChanged(nameof(HasPendingRecovery)); } }
+    public RecoveryCandidate? PendingRecovery
+    {
+        get => _pendingRecovery;
+        private set
+        {
+            if (!Set(ref _pendingRecovery, value)) return;
+            OnPropertyChanged(nameof(HasPendingRecovery));
+            OnPropertyChanged(nameof(PendingRecoveryAutosavedAt));
+        }
+    }
     public bool HasPendingRecovery => PendingRecovery is not null;
+    public DateTimeOffset? PendingRecoveryAutosavedAt => PendingRecovery?.AutosavedAtUtc.ToLocalTime();
     public string DiagnosticsText { get => _diagnosticsText; private set => Set(ref _diagnosticsText, value); }
     public string ValidationCode { get => _validationCode; set => Set(ref _validationCode, value); }
     public string ValidationReport { get => _validationReport; private set => Set(ref _validationReport, value); }
@@ -154,7 +166,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         SetProject(AudioLab.Project, null, false);
         _settings = await settingsStore.LoadAsync(token);
         RecentProjects = _settings.RecentProjects.Select(value => new RecentProjectViewModel(value)).ToArray();
-        PendingRecovery = (await recoveryService.FindRecoverableAsync(token)).FirstOrDefault();
+        await RefreshPendingRecoveriesAsync(token);
         KeybindProfiles = await profileService.LoadAsync(token);
         SelectedKeybindProfile = KeybindProfiles.FirstOrDefault();
         GameBridgeStatus = "DISARMED";
@@ -180,9 +192,24 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
 
     public async Task SaveProjectAsync(string path, CancellationToken token = default)
     {
-        _projectPath = Path.GetFullPath(path);
-        await projectStore.SaveAsync(_project, _projectPath, token);
-        IsDirty = false; await RememberProjectAsync(token);
+        var savedPath = Path.GetFullPath(path);
+        var previousPath = _projectPath;
+        await _autosaveGate.WaitAsync(token);
+        try
+        {
+            await projectStore.SaveAsync(_project, savedPath, token);
+            await recoveryService.CompleteProjectSaveAsync(_project.Id, previousPath, savedPath, token);
+            if (_openedRecovery is not null && _openedRecovery.ProjectId == _project.Id)
+            {
+                await recoveryService.DiscardAsync(_openedRecovery, token);
+                _openedRecovery = null;
+            }
+            _projectPath = savedPath;
+            IsDirty = false;
+        }
+        finally { _autosaveGate.Release(); }
+        await RememberProjectAsync(token);
+        await RefreshPendingRecoveriesAsync(token);
         OnPropertyChanged(nameof(ProjectPath)); Status = $"Saved project '{ProjectName}'.";
     }
 
@@ -202,13 +229,17 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         var candidate = PendingRecovery;
         var project = await recoveryService.RecoverAsync(candidate, token);
         SetProject(project, candidate.OriginalProjectPath, true);
-        PendingRecovery = null; Status = $"Recovered '{project.Metadata.Title}'. Save explicitly to keep the recovered version.";
+        _openedRecovery = candidate;
+        RemovePendingRecovery(candidate);
+        Status = $"Recovered '{project.Metadata.Title}'. Save explicitly to keep the recovered version.";
     }
 
     public async Task DiscardRecoveryAsync(CancellationToken token = default)
     {
         if (PendingRecovery is null) return;
-        await recoveryService.DiscardAsync(PendingRecovery, token); PendingRecovery = null;
+        var candidate = PendingRecovery;
+        await recoveryService.DiscardAsync(candidate, token);
+        RemovePendingRecovery(candidate);
     }
 
     public async Task RunDiagnosticsAsync(CancellationToken token = default) => DiagnosticsText = (await diagnostics.RunAsync(token)).ToText();
@@ -469,8 +500,28 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     {
         _autosaveCancellation?.Cancel();
         try { await _autosaveLoop.WaitAsync(token); } catch (OperationCanceledException) when (_autosaveCancellation?.IsCancellationRequested == true) { }
-        await _autosaveGate.WaitAsync(token); _autosaveGate.Release();
+        await _autosaveGate.WaitAsync(token);
+        try { await recoveryService.CompleteCleanShutdownAsync(_project.Id, _projectPath, IsDirty, token); }
+        finally { _autosaveGate.Release(); }
         await settingsStore.SaveAsync(_settings, token);
+    }
+
+    private async Task RefreshPendingRecoveriesAsync(CancellationToken token)
+    {
+        var knownPaths = _settings.RecentProjects.Select(value => value.Path)
+            .Append(_projectPath)
+            .OfType<string>()
+            .Distinct(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal)
+            .ToArray();
+        _pendingRecoveries = await recoveryService.FindRecoverableAsync(knownPaths, token);
+        PendingRecovery = _pendingRecoveries.FirstOrDefault();
+    }
+
+    private void RemovePendingRecovery(RecoveryCandidate candidate)
+    {
+        _pendingRecoveries = _pendingRecoveries.Where(value => !string.Equals(value.AutosavePath, candidate.AutosavePath,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)).ToArray();
+        PendingRecovery = _pendingRecoveries.FirstOrDefault();
     }
 
     public async ValueTask DisposeAsync()

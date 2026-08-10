@@ -45,7 +45,15 @@
                   <TextBlock Text="{DynamicResource Recovery}" FontSize="20" FontWeight="SemiBold" />
                   <TextBlock Text="{DynamicResource RecoveryHelp}" TextWrapping="Wrap" />
                   <TextBlock Text="{Binding PendingRecovery.ProjectName}" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding PendingRecovery.AutosavedAtUtc}" />
+                  <TextBlock Text="{Binding PendingRecovery.OriginalProjectPath}" TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <TextBlock Text="{DynamicResource ProjectId}" Opacity="0.7" />
+                    <TextBlock Grid.Column="1" Text="{Binding PendingRecovery.ProjectId}" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <TextBlock Text="{DynamicResource AutosaveTime}" Opacity="0.7" />
+                    <TextBlock Grid.Column="1" Text="{Binding PendingRecoveryAutosavedAt}" />
+                  </Grid>
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="8"><Button Content="{DynamicResource Recover}" Click="Recover_Click"/><Button Grid.Column="1" Content="{DynamicResource Discard}" Click="DiscardRecovery_Click"/></Grid>
                 </StackPanel>
               </Border>

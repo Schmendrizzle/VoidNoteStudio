@@ -1,11 +1,43 @@
 using VoidNote.Application.Diagnostics;
 using VoidNote.Application.Projects;
 using VoidNote.Application.Settings;
+using System.Xml.Linq;
 
 namespace VoidNote.IntegrationTests;
 
 public sealed class ReleaseInfrastructureTests
 {
+    [Theory]
+    [InlineData("win-x64")]
+    [InlineData("linux-x64")]
+    public void OfficialPortablePublishProfiles_AreSelfContainedAndMultiFile(string runtime)
+    {
+        var root = FindRepositoryRoot();
+        var profile = XDocument.Load(Path.Combine(root, "src", "VoidNote.App", "Properties", "PublishProfiles", $"{runtime}-portable.pubxml"));
+        var properties = profile.Descendants("PropertyGroup").Elements().ToDictionary(element => element.Name.LocalName, element => element.Value);
+
+        Assert.Equal(runtime, properties["RuntimeIdentifier"]);
+        Assert.Equal("true", properties["SelfContained"]);
+        Assert.Equal("true", properties["UseAppHost"]);
+        Assert.Equal("false", properties["PublishSingleFile"]);
+        Assert.Equal("false", properties["PublishTrimmed"]);
+    }
+
+    [Fact]
+    public void ReleaseAutomation_UsesPortableProfilesAndSelfContainedValidation()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var relativePath in new[] { "scripts/build-release.ps1", "scripts/build-release.sh", ".github/workflows/ci.yml" })
+        {
+            var content = File.ReadAllText(Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            Assert.Contains("PublishProfile", content, StringComparison.Ordinal);
+            Assert.True(content.Contains("--runtime", StringComparison.OrdinalIgnoreCase) || content.Contains("-Runtime", StringComparison.Ordinal),
+                $"{relativePath} does not pass the expected RID to package validation.");
+            Assert.DoesNotContain("--self-contained false", content, StringComparison.OrdinalIgnoreCase);
+        }
+        Assert.Contains("VoidNote.Packaging", File.ReadAllText(Path.Combine(root, "scripts", "build-release.ps1")), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AutosaveIntervals_AreBoundedAndDisabledIsExplicit()
     {
@@ -38,5 +70,13 @@ public sealed class ReleaseInfrastructureTests
 
         Assert.Contains("VoidNote Diagnostics 1.0.0-rc1", report.ToText());
         Assert.Contains("\"ApplicationVersion\": \"1.0.0-rc1\"", report.ToJson());
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "VoidNoteStudio.sln")))
+            directory = directory.Parent;
+        return directory?.FullName ?? throw new DirectoryNotFoundException("Could not locate the repository root.");
     }
 }

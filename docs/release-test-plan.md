@@ -5,7 +5,7 @@ Record OS, build hash, package name, result and notes for every run. Use generat
 ## Windows x64 and Linux x64 common checks
 
 - [ ] Extract the portable package into a new writable folder; confirm no logs, models, test output, `.git`, `bin` or `obj` content.
-- [ ] Run `VoidNote.App --version` / `dotnet VoidNote.App.dll --version`; confirm `1.0.0-rc1`.
+- [ ] Run the native app host (`VoidNote.App.exe --version` / `./VoidNote.App --version`); confirm `1.0.0-rc1`. Do not use `dotnet VoidNote.App.dll` as proof of self-contained packaging.
 - [ ] Start the GUI with no optional dependencies; Welcome/Project appears and no account/cloud is requested.
 - [ ] Switch English/German and System/Light/Dark, restart, and confirm selection plus readable focus indicators/high contrast.
 - [ ] Keyboard-tab through Project, Audio, Shawzin, Creator, Mandachord and Settings; verify focus order, labels, tooltips and 150–200% UI scaling.
@@ -38,7 +38,8 @@ Record OS, build hash, package name, result and notes for every run. Use generat
 
 ## Platform-specific packaging
 
-- [ ] Windows: ZIP extracts/runs without installation; document .NET requirement and expected unsigned SmartScreen warning.
+- [ ] Windows: on a machine without a global .NET runtime, ZIP extracts and `VoidNote.App.exe` starts; document only the expected unsigned SmartScreen warning.
+- [ ] Linux: on a representative x64 desktop without a global .NET runtime, the extracted `VoidNote.App` starts and retains its executable permission.
 - [ ] Ubuntu: tar.gz extracts as user, executable permission is correct, app starts in a desktop session.
 - [ ] Linux X11 and Wayland differences match UI and documentation; no root/uinput workaround.
-- [ ] GitHub Actions Windows and Ubuntu jobs pass restore, build, tests, publish, validation and `--version` startup probe.
+- [ ] GitHub Actions Windows and Ubuntu jobs pass restore, build, tests, self-contained publish validation and native app-host `--version` startup probe.

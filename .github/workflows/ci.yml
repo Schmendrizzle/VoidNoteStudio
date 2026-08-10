@@ -39,8 +39,9 @@ jobs:
         shell: pwsh
         run: |
           $runtime = if ('${{ runner.os }}' -eq 'Windows') { 'win-x64' } else { 'linux-x64' }
-          dotnet publish src/VoidNote.App/VoidNote.App.csproj --configuration Release --runtime $runtime --self-contained false --output artifacts/smoke -p:DebugType=None -p:DebugSymbols=false
+          dotnet publish src/VoidNote.App/VoidNote.App.csproj --configuration Release -p:PublishProfile="$runtime-portable" --output artifacts/smoke
           Get-ChildItem artifacts/smoke -Recurse -Filter '*.pdb' | Remove-Item -Force
           Copy-Item README.md, THIRD_PARTY_NOTICES.md, LICENSE -Destination artifacts/smoke
-          python scripts/validate-package.py artifacts/smoke
-          dotnet artifacts/smoke/VoidNote.App.dll --version
+          python scripts/validate-package.py artifacts/smoke --runtime $runtime
+          $appHost = if ($runtime -eq 'win-x64') { 'artifacts/smoke/VoidNote.App.exe' } else { 'artifacts/smoke/VoidNote.App' }
+          & $appHost --version

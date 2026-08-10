@@ -1,5 +1,9 @@
 # VoidNote Studio User Guide
 
+## Portable installation
+
+Extract the complete official `win-x64` ZIP or `linux-x64` tarball before starting VoidNote. These packages are self-contained and include the required .NET 10 runtime, so no global .NET installation is required. Keep all extracted files together; the runtime libraries and the bundled Python worker script are resolved from the package directory. FFmpeg and Python remain optional external tools for the features described below.
+
 ## Projects and recovery
 
 Create or open projects from **Project**. `.vns` files are versioned ZIP containers; do not edit their contents manually. The header shows the open project, unsaved state and background jobs. Saving is atomic. Autosave uses separate recovery snapshots under application data and never replaces the normal `.vns` file. On the next start, a newer snapshot shows its project and time. **Recover** opens it as unsaved work; **Ignore / Discard** removes only that recovery snapshot.
