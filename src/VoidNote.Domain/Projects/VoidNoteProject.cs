@@ -8,7 +8,7 @@ namespace VoidNote.Domain.Projects;
 public sealed class VoidNoteProject
 {
     /// <summary>The project format version produced by this milestone.</summary>
-    public const int CurrentFormatVersion = 1;
+    public const int CurrentFormatVersion = 2;
 
     /// <summary>Gets or initializes the serialized format version.</summary>
     public int FormatVersion { get; init; } = CurrentFormatVersion;
@@ -32,7 +32,17 @@ public sealed class VoidNoteProject
     public List<AudioRegion> AudioRegions { get; init; } = [];
 
     /// <summary>Gets or initializes separated-stem references.</summary>
-    public List<Stem> Stems { get; init; } = [];
+    public List<StemSet> StemSets { get; init; } = [];
+
+    /// <summary>Preserves incomplete version-1 stem placeholders without silently inventing provenance.</summary>
+    public List<LegacyStemReference> LegacyStemReferences { get; init; } = [];
+
+    /// <summary>Gets persisted transcription reports and their cleanup audit trail.</summary>
+    public List<AudioTranscriptionReport> AudioTranscriptionReports { get; init; } = [];
+
+    /// <summary>Remembers the loaded schema for safe migration backups; it is not serialized.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int LoadedFormatVersion { get; set; } = CurrentFormatVersion;
 
     /// <summary>Gets or initializes normalized MIDI tracks.</summary>
     public List<MidiTrack> MidiTracks { get; init; } = [];
@@ -68,7 +78,10 @@ public sealed class VoidNoteProject
             .Concat(AudioTracks)
             .Concat(AudioTracks.SelectMany(track => track.Clips))
             .Concat(AudioRegions)
-            .Concat(Stems)
+            .Concat(StemSets)
+            .Concat(StemSets.SelectMany(set => set.StemTracks))
+            .Concat(LegacyStemReferences)
+            .Concat(AudioTranscriptionReports)
             .Concat(MidiTracks)
             .Concat(ShawzinTracks)
             .Concat(MandachordTracks)
@@ -92,5 +105,17 @@ public sealed class VoidNoteProject
             throw new InvalidOperationException("Every audio clip must reference a project audio source.");
 
         foreach (var region in AudioRegions) region.Validate();
+
+        foreach (var set in StemSets)
+        {
+            if (!sourceIds.Contains(set.Source.AudioSourceId))
+                throw new InvalidOperationException("Every stem set must reference a project audio source.");
+            if (set.StemTracks.Any(stem => stem.StemSetId != set.Id || !sourceIds.Contains(stem.AudioSourceId)))
+                throw new InvalidOperationException("Every stem must belong to its set and reference an imported derived audio source.");
+        }
+
+        var midiIds = MidiTracks.Select(track => track.Id).ToHashSet();
+        if (AudioTranscriptionReports.Any(report => !midiIds.Contains(report.MidiTrackId)))
+            throw new InvalidOperationException("Every transcription report must reference a MIDI track in the project.");
     }
 }

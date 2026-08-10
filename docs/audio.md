@@ -2,7 +2,7 @@
 
 ## Umfang und Grenzen
 
-Milestone G implementiert Import, Projektverwaltung, Waveforms und Wiedergabe für WAV, FLAC und MP3. Es gibt absichtlich keine Stem Separation, Audio-to-MIDI-Transkription, Pitch-/Beat-/BPM-Erkennung oder Instrumentklassifikation.
+Milestone G implementiert Import, Projektverwaltung, Waveforms und Wiedergabe für WAV, FLAC und MP3. Milestone H ergänzt darauf nicht-destruktive Stem Separation, Audio-to-MIDI, Engine Discovery, Worker-/Temp-Lifecycle und eine leichte Stem-Mix-Vorschau. Pitch-/Beat-/BPM-Erkennung außerhalb der gekapselten Transkriptionsengine und Instrumentklassifikation bleiben offen.
 
 ## Datenmodell
 
@@ -11,6 +11,8 @@ Milestone G implementiert Import, Projektverwaltung, Waveforms und Wiedergabe f�
 - `AudioTrack`: projektweite Spur mit Gain, Mute, Solo und Active.
 - `AudioClip`: stabile ID, Source-ID, Start als `MusicalTime` auf der Master-Timeline, nicht-destruktives Trim-In, Duration, Gain und Active.
 - `AudioRegion`: Auswahlstart/-ende, berechnete Duration und Loop-Flag in präziser `AbsoluteTime`.
+- `StemSet`/`Stem`: abgeleitete AudioSources mit Engine-, Settings-, Offset- und Provenienzmetadaten.
+- `AudioTranscriptionReport`: Confidence-Verteilung, verworfene Noten, Dichte, Pitchbereich, Laufzeit und jede Cleanup-Änderung.
 
 Die Domain kennt weder FFmpeg-Typen noch Avalonia oder ein konkretes Audio-Backend. Originaldateien werden nur lesend geöffnet und nie verändert.
 
@@ -88,3 +90,6 @@ Behandelte Fehlerklassen: Datei fehlt/unlesbar, ungültiges Audio, unsupported c
 - Kein sample-genauer Mix mehrerer gleichzeitig klingender Audio-Tracks; Milestone G spielt den ausgewählten Track und berücksichtigt projektweite Solo-Zustände.
 - Eingebettete Quellen werden zum Dekodieren lokal extrahiert; ein Lifecycle-/Größenmanager für diese Arbeitskopien folgt später.
 - Trim-Out wird durch Clip-Duration repräsentiert; es gibt noch keinen separaten Trim-Out-Wert im UI.
+- Mehrere Stem-Previewprozesse teilen eine monotone Uhr, aber FFplay-/Hardwarepuffer sind nicht samplegenau gekoppelt.
+- Gemeinsame Audio/MIDI-Synth-Vorschau ist noch kein synchroner DAW-Mix; die Einschränkung wird im Audio-Intelligence-Bereich transparent gehalten.
+- AI-Dependencies und Modelle sind optional und werden niemals automatisch installiert oder heruntergeladen.

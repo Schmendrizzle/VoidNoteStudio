@@ -1,8 +1,8 @@
-# VoidNote Studio – Architekturstand Milestone G
+# VoidNote Studio – Architekturstand Milestone H
 
 ## Geltungsbereich
 
-Dieses Dokument beschreibt die implementierte Architektur nach **Milestone G – Audio Lab Core**. Foundation, MIDI Core, Shawzin Codec, Composer/Arranger, die optionale gekapselte Ingame-Wiedergabe, Multi-Shawzin-Ensembles und die grundlegende Audio-Infrastruktur sind enthalten. Stem Separation, Audio-to-MIDI, Mandachord und der spätere Take Manager bleiben späteren Milestones vorbehalten.
+Dieses Dokument beschreibt die implementierte Architektur nach **Milestone H – Audio Intelligence**. Stem Separation und Audio-to-MIDI sind als optionale, lokal ausgeführte Worker-Engines enthalten. Mandachord und der Take Manager bleiben späteren Milestones vorbehalten.
 
 ## Technische Basis
 
@@ -24,7 +24,7 @@ Dieses Dokument beschreibt die implementierte Architektur nach **Milestone G –
 | `VoidNote.Infrastructure` | JSON-Settings, ZIP-basiertes `.vns`-Format, lokale JSON-Logs, Anwendungspfade | Application, Domain |
 | `VoidNote.App` | Avalonia-Host, Composition Root, DI-Registrierung, MVVM-Shell | Application, Infrastructure |
 | `VoidNote.Midi` | Gekapselter SMF-Import/-Export, Playback-Scheduler und Geräteverträge | Domain, DryWetMIDI |
-| `VoidNote.Audio` | Decoderports, WAV-/FFmpeg-Adapter, Audioimport, Waveform-Pyramide/-Cache, Playback und Geräteports | Domain, Microsoft.Extensions.Logging |
+| `VoidNote.Audio` | Decoder, Waveform/Playback sowie engine-neutrale Audio-Intelligence-Ports, Workerprozessadapter, Separation-/Transkriptionsworkflow und nachvollziehbare Musiktransformationen | Domain, Microsoft.Extensions.Logging |
 | `VoidNote.Shawzin` | Codec, Mapping, Analyse, Arrangement, Preview sowie UI-unabhängige Multi-Shawzin-Trennung und Ensemble-Wiedergabe | Domain |
 | `VoidNote.Mandachord` | reservierte Modulgrenze; keine Arrangementlogik implementiert | keine |
 | `VoidNote.GameBridge` | Portable Input-Ports, Keybind-Profile, Mapping, Arm/Disarm, Diagnostik sowie getrennte Windows-/Linux-Adapter | Application, Domain, Shawzin |
@@ -55,7 +55,7 @@ VoidNote.Domain ─────────────────> keine exter
 
 ## Zentrales Projekt- und Zeitmodell
 
-`VoidNoteProject` bleibt die versionierte Wurzel des normalisierten Modells (`formatVersion = 1`). `MidiTrack` enthält `MusicalEvent`-Noten mit stabiler ID, Starttick, Dauer, Pitch, Velocity, Herkunft und Confidence.
+`VoidNoteProject` bleibt die versionierte Wurzel des normalisierten Modells (`formatVersion = 2`). Version 1 wird beim Laden in-memory migriert; vor dem ersten Speichern über eine bestehende v1-Datei entsteht einmalig eine `.v1.bak`-Sicherung. `MidiTrack` enthält `MusicalEvent`-Noten mit stabiler ID, Starttick, Dauer, Pitch, Velocity, Herkunft, Confidence und optionaler dauerhafter Audio-Provenienz.
 
 `AudioSource` beschreibt immutable Quelldateien mit expliziter eingebetteter, relativer oder absoluter Referenz und formatunabhängigen Metadaten. `AudioTrack` enthält nicht-destruktive `AudioClip`-Platzierungen; deren `MusicalTime`-Start liegt auf derselben `ProjectTimeline` wie MIDI und Shawzin. Gain, Mute, Solo, Active, Trim-In und Dauer verändern die Originaldatei nicht. `AudioRegion` speichert Auswahl und Loop in präziser `AbsoluteTime`.
 
@@ -106,6 +106,16 @@ Der Codec bleibt von MIDI-Zuordnung, Skalenwahl, Compatibility-Bewertung und Wie
 
 `WaveformGenerator` verarbeitet begrenzte PCM-Blöcke zu 256-Frame-Min/Max-Peaks und baut daraus gröbere Zweier-Stufen. `FileWaveformCache` speichert die versionierte Pyramide lokal; der Schlüssel enthält Pfad, Dateigröße, Änderungszeit, Decoder-ID, Codec, Sample Rate, Kanäle und Bit Depth. Beschädigte oder veraltete Daten werden nicht verwendet. Details stehen in `docs/audio.md`.
 
+## Audio Intelligence
+
+`IAudioSeparationEngine`, `IAudioTranscriptionEngine` und der vorbereitete `IAudioAnalysisEngine` verwenden ausschließlich BCL-/VoidNote-Typen. Die ersten Adapter sind `DemucsSeparationEngine` und `BasicPitchTranscriptionEngine`. Beide delegieren an `IAudioWorkerClient`; Python-, Torch-, TensorFlow- oder Modelltypen gelangen weder in Domain noch UI.
+
+`ProcessAudioWorkerClient` startet pro Operation einen lokalen Worker, schreibt genau eine versionierte JSON-Anforderung und liest JSONL-Progress/Result-Nachrichten. Cancellation, Timeout, Protokollfehler und Worker-Crash beenden den gesamten Prozessbaum. `AiResourceGate` begrenzt Modellinstanziierungen konfigurierbar, standardmäßig auf einen Job. `AudioIntelligenceTempManager` besitzt markierte Jobordner, räumt sie in jedem Erfolgs-/Fehlerpfad auf und kann alte verwaiste Ordner beim nächsten Start entfernen.
+
+`StemSet` und seine `Stem`-Assets bewahren Quelle/Region, Source- und Timeline-Offset, Engine/Version, Settings, Metadaten und Provenienz. Die vier Standardtypen bleiben eine erweiterbare Enum-/Custom-Grenze. Abgeleitete Audiodateien werden als eigene `AudioSource` plus `AudioTrack` importiert; das Original bleibt unverändert. `AudioStemMixPreview` koordiniert mehrere vorhandene Preview-Engines für Solo/Mute-Kombinationen, garantiert aber noch keine sample-genaue Hardware-Synchronisation.
+
+Der Transkriptionsprocessor projiziert Sekunden auf die Master-Timeline, klassifiziert konfigurierbare Confidence, filtert nur mit Report, bewahrt Roh-Timing vor Quantisierung und protokolliert Ghost-Note-, Merge-, Duplicate- und Outlier-Entscheidungen. Ergebnisse sind normale `MidiTrack`-/`MusicalEvent`-Daten und laufen ohne Sonderpfad durch Piano Roll, Shawzin Analyzer/Arranger und Multi-Shawzin Splitter. Details stehen in `docs/audio-intelligence.md`, `docs/stem-separation.md`, `docs/audio-to-midi.md` und `docs/ai-worker-protocol.md`.
+
 ## Piano Roll
 
 `PianoRollViewModel` in Application ist eine schreibgeschützte, Avalonia-unabhängige Projektion eines normalisierten MIDI-Tracks. Sie stellt Ticks, Beats, musikalische und absolute Positionen für eine spätere Oberfläche bereit. Editierwerkzeuge, Quantisierung und aufwendige Darstellung sind noch nicht implementiert.
@@ -126,9 +136,9 @@ Die Bridge ist standardmäßig disarmed. Profilvalidierung, Fokusprüfung und Ca
 
 ## Persistenz und Foundation-Dienste
 
-Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `project.json`; eingebettete Audioquellen liegen unverändert unter `audio/`, externe Referenzen bleiben explizit relativ oder absolut. Settings und Projekte werden atomar geschrieben; Logging bleibt lokal und ohne Telemetrie; Undo/Redo bleibt UI-unabhängig. Ältere Version-1-Projekte ohne Audiofelder oder Taktarten-Map bleiben ladbar und erhalten leere Audio-Collections beziehungsweise die Default-Taktart 4/4.
+Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `project.json`; eingebettete Audioquellen liegen unverändert unter `audio/`, Stem-Assets unter `stems/`, externe Referenzen bleiben explizit relativ oder absolut. Settings und Projekte werden atomar geschrieben; Logging bleibt lokal und ohne Telemetrie; Undo/Redo bleibt UI-unabhängig. Ältere Version-1-Projekte bleiben ladbar. Unvollständige v1-Stem-Platzhalter werden als `LegacyStemReferences` verlustfrei bewahrt, statt erfundene Engine-Provenienz zu erhalten.
 
-## Bewusst offene Punkte nach Milestone F
+## Bewusst offene Punkte nach Milestone H
 
 - MIDI-Kanäle, Program Changes, Controller, Marker und SysEx sind noch nicht Teil des normalisierten Domain-Modells.
 - SMPTE-Time-Division wird abgelehnt; der MIDI Core verwendet PPQ.
@@ -148,4 +158,8 @@ Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `p
 - FFmpeg/ffprobe/ffplay werden nicht gebündelt. Ohne die optionale Installation bleiben WAV-Import, Waveforms für WAV und alle nicht-Audio-Module nutzbar; MP3/FLAC und Live-Ausgabe melden ihre fehlende Capability.
 - FFplay verwendet in Milestone G das System-Defaultgerät; native Geräteauswahl und Enumeration sind noch nicht implementiert.
 - Audio-Synchronisation verwendet einen monotonic-clock-Anker und vermeidet kumulative Schedulerdrift, verspricht aber noch keine sample-genaue DAW- oder Hardware-Clock-Synchronisation.
+- Demucs und Basic Pitch werden nicht gebündelt oder still installiert. Reale Qualität/Performance hängt von der ausdrücklich eingerichteten lokalen Python-Umgebung und den Modellen ab.
+- Basic Pitch ist ein polyphones General-Pitch-Modell, kein Drum-to-MIDI-System. Drum-Stems werden vom Adapter ausdrücklich abgelehnt.
+- `Monophonic` wird beim Basic-Pitch-Adapter konservativ aus polyphonen Detektionen reduziert und vollständig reportet; ein spezialisiertes monophones Modell kann ohne Domainänderung ergänzt werden.
+- Audio- plus synthetische MIDI-Synchronvorschau ist noch nicht clock-gekoppelt. MIDI-Daten sind editier- und arrangierbar; der bestehende Shawzin-Previewpfad kann nach Arrangement separat verglichen werden.
 - GameBridge bleibt unverändert auf einen ausgewählten, bereits arrangierten Ensemble-Track begrenzt.

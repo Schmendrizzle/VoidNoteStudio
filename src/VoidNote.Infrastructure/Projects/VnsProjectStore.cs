@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using VoidNote.Application.Projects;
 using VoidNote.Domain.Projects;
 
@@ -32,8 +33,16 @@ public sealed class VnsProjectStore : IProjectStore
         try
         {
             await using var manifest = entry.Open();
-            var project = await JsonSerializer.DeserializeAsync<VoidNoteProject>(manifest, SerializerOptions, cancellationToken)
+            var document = await JsonNode.ParseAsync(manifest, cancellationToken: cancellationToken)
                 ?? throw new InvalidDataException("The project manifest contains no project object.");
+            var loadedVersion = document["FormatVersion"]?.GetValue<int>()
+                ?? document["formatVersion"]?.GetValue<int>() ?? 1;
+            if (loadedVersion is < 1 or > VoidNoteProject.CurrentFormatVersion)
+                throw new InvalidDataException($"Unsupported project format version: {loadedVersion}.");
+            MigrateManifest(document, loadedVersion);
+            var project = document.Deserialize<VoidNoteProject>(SerializerOptions)
+                ?? throw new InvalidDataException("The project manifest contains no project object.");
+            project.LoadedFormatVersion = loadedVersion;
             project.Validate();
             await ExtractEmbeddedAudioAsync(project, archive, cancellationToken);
             return project;
@@ -85,7 +94,13 @@ public sealed class VnsProjectStore : IProjectStore
                 }
             }
 
+            if (project.LoadedFormatVersion < VoidNoteProject.CurrentFormatVersion && File.Exists(fullPath))
+            {
+                var backupPath = fullPath + $".v{project.LoadedFormatVersion}.bak";
+                if (!File.Exists(backupPath)) File.Copy(fullPath, backupPath);
+            }
             File.Move(temporaryPath, fullPath, overwrite: true);
+            project.LoadedFormatVersion = VoidNoteProject.CurrentFormatVersion;
         }
         finally
         {
@@ -120,6 +135,22 @@ public sealed class VnsProjectStore : IProjectStore
                 File.Move(temporary, target, true); source.ResolvedPath = target;
             }
             finally { File.Delete(temporary); }
+        }
+    }
+
+    private static void MigrateManifest(JsonNode document, int loadedVersion)
+    {
+        if (document is not JsonObject root) throw new InvalidDataException("The project manifest root must be an object.");
+        if (loadedVersion == 1)
+        {
+            var legacyStems = root["Stems"]?.DeepClone() ?? root["stems"]?.DeepClone() ?? new JsonArray();
+            root["LegacyStemReferences"] = legacyStems;
+            root.Remove("Stems");
+            root.Remove("stems");
+            root["StemSets"] ??= new JsonArray();
+            root["AudioTranscriptionReports"] ??= new JsonArray();
+            root["FormatVersion"] = VoidNoteProject.CurrentFormatVersion;
+            root.Remove("formatVersion");
         }
     }
 }

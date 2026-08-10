@@ -63,6 +63,20 @@ public sealed class AudioPlaybackTests
         await using var device = new DiagnosticAudioOutputDevice(); await device.StartAsync(44100, 2); await device.WriteAsync(new([0, 0, 1, -1], 44100, 2)); await device.StopAsync(); Assert.Equal(2, device.FramesWritten); Assert.Equal("Diagnostic", device.Capability.Backend);
     }
 
+    [Fact]
+    public async Task StemMixPreview_PlaysAllAudibleStemsAndHonorsMute()
+    {
+        var decoder = new CapturingDecoder(); var provider = new DiagnosticProvider();
+        await using var preview = new AudioStemMixPreview(decoder, new FakeClock(), provider, NullLoggerFactory.Instance);
+        var (project, first) = Project(); var second = new AudioTrack { Name = "Bass", Clips = [new() { Name = "Bass", SourceId = first.Clips[0].SourceId, Duration = new(1) }] };
+        var muted = new AudioTrack { Name = "Drums", IsMuted = true, Clips = [new() { Name = "Drums", SourceId = first.Clips[0].SourceId, Duration = new(1) }] };
+        project.AudioTracks.AddRange([second, muted]);
+
+        await preview.PlayAsync(project, [first, second, muted]);
+
+        Assert.Equal(2, provider.Devices.Count); Assert.All(provider.Devices, device => Assert.Equal(4, device.FramesWritten));
+    }
+
     private static AudioPlaybackEngine Engine(IAudioDecoder decoder, IAudioPlaybackClock clock) => new(decoder, clock, NullLogger<AudioPlaybackEngine>.Instance);
     private static (VoidNoteProject Project, AudioTrack Track) Project(long startTicks = 0, decimal duration = 1)
     {
@@ -91,5 +105,14 @@ public sealed class AudioPlaybackTests
         public override async Task DecodeAsync(AudioDecodeRequest request, Func<AudioPcmChunk, CancellationToken, ValueTask> consumer, IProgress<double>? progress = null, CancellationToken cancellationToken = default) { Started.TrySetResult(); await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
         public void Reset() => Started = NewSource();
         private static TaskCompletionSource NewSource() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class DiagnosticProvider : IAudioDeviceProvider
+    {
+        public List<DiagnosticAudioOutputDevice> Devices { get; } = [];
+        public AudioDeviceCapability Capability { get; } = new(true, "Diagnostic", "In-memory", false);
+        public Task<IReadOnlyList<AudioDeviceInfo>> GetDevicesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<AudioDeviceInfo>>([]);
+        public Task<IAudioOutputDevice> OpenDefaultAsync(CancellationToken cancellationToken = default)
+        { var device = new DiagnosticAudioOutputDevice(); Devices.Add(device); return Task.FromResult<IAudioOutputDevice>(device); }
     }
 }

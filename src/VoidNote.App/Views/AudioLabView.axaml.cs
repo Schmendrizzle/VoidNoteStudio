@@ -24,4 +24,11 @@ public sealed partial class AudioLabView : UserControl
     private async void Stop_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) { if (ViewModel is not null) await ViewModel.StopAsync(); }
     private async void Seek_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) { if (ViewModel is not null) await ViewModel.SeekAsync(); }
     private void RemoveTrack_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) { if ((sender as Control)?.DataContext is AudioTrackRowViewModel track) track.Remove(); }
+    private async void DiscoverEngines_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) { if (ViewModel is not null) await ViewModel.DiscoverEnginesAsync(); }
+    private async void Separate_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) { if (ViewModel is not null) await ViewModel.SeparateAsync(); }
+    private async void Transcribe_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) { if (ViewModel is not null) await ViewModel.TranscribeAsync(); }
+    private void Original_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel?.CompareOriginal();
+    private void Stem_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel?.CompareStem();
+    private async void StemMix_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) { if (ViewModel is not null) await ViewModel.PlayStemMixAsync(); }
+    private void RemoveStemSet_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel?.RemoveSelectedStemSet();
 }

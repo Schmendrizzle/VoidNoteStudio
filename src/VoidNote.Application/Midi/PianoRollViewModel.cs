@@ -4,7 +4,19 @@ using VoidNote.Domain.Projects;
 namespace VoidNote.Application.Midi;
 
 /// <summary>UI-framework-independent projection of one note for a future piano roll.</summary>
-public sealed record PianoRollNoteViewModel(Guid Id, long StartTick, long DurationTicks, int Pitch, int Velocity, decimal StartBeat, MusicalPosition MusicalPosition, AbsoluteTime AbsoluteStart);
+public sealed record PianoRollNoteViewModel(
+    Guid Id,
+    long StartTick,
+    long DurationTicks,
+    int Pitch,
+    int Velocity,
+    decimal Confidence,
+    MusicalEventSource Source,
+    VoidNote.Domain.Audio.NoteConfidenceLevel? ConfidenceLevel,
+    VoidNote.Domain.Audio.DetectionEditStatus? DetectionStatus,
+    decimal StartBeat,
+    MusicalPosition MusicalPosition,
+    AbsoluteTime AbsoluteStart);
 
 /// <summary>Minimal read-only piano-roll data source; editing UI is intentionally deferred.</summary>
 public sealed class PianoRollViewModel
@@ -19,7 +31,9 @@ public sealed class PianoRollViewModel
         Notes = track.Events
             .OrderBy(note => note.StartTime.Ticks)
             .ThenBy(note => note.Pitch)
-            .Select(note => new PianoRollNoteViewModel(note.Id, note.StartTime.Ticks, note.Duration.Ticks, note.Pitch, note.Velocity, timeline.ToBeats(note.StartTime), timeline.ToMusicalPosition(note.StartTime), timeline.ToAbsoluteTime(note.StartTime)))
+            .Select(note => new PianoRollNoteViewModel(note.Id, note.StartTime.Ticks, note.Duration.Ticks, note.Pitch, note.Velocity,
+                note.Confidence, note.Source, note.AudioProvenance?.ConfidenceLevel, note.AudioProvenance?.EditStatus,
+                timeline.ToBeats(note.StartTime), timeline.ToMusicalPosition(note.StartTime), timeline.ToAbsoluteTime(note.StartTime)))
             .ToArray();
     }
 

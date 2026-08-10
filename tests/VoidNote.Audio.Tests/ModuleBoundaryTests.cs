@@ -22,11 +22,20 @@ public sealed class ModuleBoundaryTests
     }
 
     [Fact]
-    public void MilestoneG_DoesNotExposeTranscriptionOrSeparationEngines()
+    public void MilestoneH_ExposesReplaceableTranscriptionAndSeparationContracts()
     {
         var names = typeof(IAudioDecoder).Assembly.ExportedTypes.Select(value => value.Name).ToArray();
-        Assert.DoesNotContain(names, value => value.Contains("Transcription", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(names, value => value.Contains("Separation", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(names, value => value.Contains("PitchDetection", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("IAudioTranscriptionEngine", names);
+        Assert.Contains("IAudioSeparationEngine", names);
+        Assert.Contains("IAudioWorkerClient", names);
+    }
+
+    [Fact]
+    public void Domain_HasNoPythonOrMlRuntimeDependency()
+    {
+        var references = typeof(AudioTrack).Assembly.GetReferencedAssemblies().Select(value => value.Name ?? string.Empty).ToArray();
+        Assert.DoesNotContain(references, value => value.Contains("Python", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(references, value => value.Contains("TensorFlow", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(references, value => value.Contains("Torch", StringComparison.OrdinalIgnoreCase));
     }
 }

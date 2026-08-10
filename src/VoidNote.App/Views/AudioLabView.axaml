@@ -4,7 +4,7 @@
              xmlns:controls="using:VoidNote.App.Controls"
              x:Class="VoidNote.App.Views.AudioLabView"
              x:DataType="vm:AudioLabViewModel">
-  <Grid Margin="22" RowDefinitions="Auto,*,Auto" RowSpacing="14">
+  <Grid Margin="22" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="14">
     <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
       <Button Content="Import audio…" Click="ImportAudio_Click" />
       <Button Grid.Column="1" Content="Zoom −" Click="ZoomOut_Click" />
@@ -55,6 +55,52 @@
         </Grid>
       </Grid>
     </Grid>
-    <TextBlock Grid.Row="2" Text="{Binding Status}" TextWrapping="Wrap" />
+    <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="14">
+      <Expander Header="Separation" IsExpanded="True">
+        <StackPanel Spacing="8" Margin="8">
+          <TextBlock Text="{Binding EngineStatus}" TextWrapping="Wrap" Opacity="0.75" />
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+            <TextBlock Text="Engine" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" ItemsSource="{Binding SeparationEngines}" SelectedItem="{Binding SelectedSeparationEngine, Mode=OneWay}" />
+          </Grid>
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+            <TextBlock Text="Compute" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" ItemsSource="{Binding ComputeDevices}" SelectedItem="{Binding ComputeDevice}" />
+            <Button Grid.Column="2" Content="Check engines" Click="DiscoverEngines_Click" />
+            <Button Grid.Column="3" Content="Separate" Click="Separate_Click" />
+          </Grid>
+          <ListBox ItemsSource="{Binding Stems}" SelectedItem="{Binding SelectedStem}" MaxHeight="120">
+            <ListBox.ItemTemplate><DataTemplate x:DataType="vm:StemRowViewModel">
+              <StackPanel Margin="6"><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Details}" Opacity="0.7"/></StackPanel>
+            </DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
+          <Button Content="Remove selected stem set (Undo/Redo)" Click="RemoveStemSet_Click" />
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+            <Button Content="A: Original" Click="Original_Click" />
+            <Button Grid.Column="1" Content="B: Selected stem" Click="Stem_Click" />
+            <Button Grid.Column="2" Content="Play stem mix" Click="StemMix_Click" />
+          </Grid>
+        </StackPanel>
+      </Expander>
+      <Expander Grid.Column="1" Header="Transcription" IsExpanded="True">
+        <StackPanel Spacing="8" Margin="8">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+            <TextBlock Text="Engine" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" ItemsSource="{Binding TranscriptionEngines}" SelectedItem="{Binding SelectedTranscriptionEngine, Mode=OneWay}" />
+          </Grid>
+          <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8">
+            <TextBlock Text="Mode" VerticalAlignment="Center"/><ComboBox Grid.Column="1" ItemsSource="{Binding TranscriptionModes}" SelectedItem="{Binding TranscriptionMode}"/>
+            <TextBlock Grid.Column="2" Text="Quantize" VerticalAlignment="Center"/><ComboBox Grid.Column="3" ItemsSource="{Binding Quantizations}" SelectedItem="{Binding Quantization}"/>
+          </Grid>
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+            <TextBlock Text="Minimum confidence" VerticalAlignment="Center"/>
+            <NumericUpDown Grid.Column="1" Minimum="0" Maximum="1" Increment="0.05" Value="{Binding ConfidenceThreshold}"/>
+            <Button Grid.Column="2" Content="Transcribe to MIDI" Click="Transcribe_Click"/>
+          </Grid>
+          <TextBlock Text="{Binding TranscriptionMetrics}" TextWrapping="Wrap"/>
+        </StackPanel>
+      </Expander>
+    </Grid>
+    <TextBlock Grid.Row="3" Text="{Binding Status}" TextWrapping="Wrap" />
   </Grid>
 </UserControl>

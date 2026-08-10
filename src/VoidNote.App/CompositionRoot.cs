@@ -28,6 +28,7 @@ using VoidNote.Audio.Decoding;
 using VoidNote.Audio.Import;
 using VoidNote.Audio.Playback;
 using VoidNote.Audio.Waveforms;
+using VoidNote.Audio.Intelligence;
 
 namespace VoidNote.App;
 
@@ -60,6 +61,23 @@ internal static class CompositionRoot
         services.AddSingleton<IAudioDeviceProvider>(serviceProvider => new PlatformAudioDeviceProvider(
             serviceProvider.GetRequiredService<ILoggerFactory>(), startupSettings.Audio.FfplayExecutablePath ?? "ffplay"));
         services.AddTransient<AudioPlaybackEngine>();
+        services.AddTransient<AudioStemMixPreview>();
+        var workerScript = startupSettings.AudioIntelligence.WorkerScriptPath ?? Path.Combine(AppContext.BaseDirectory, "workers", "python", "voidnote_ai_worker.py");
+        services.AddSingleton<IAudioWorkerClient>(serviceProvider => new ProcessAudioWorkerClient(
+            startupSettings.AudioIntelligence.PythonExecutablePath ?? "python", workerScript,
+            TimeSpan.FromMinutes(Math.Max(1, startupSettings.AudioIntelligence.WorkerTimeoutMinutes)),
+            serviceProvider.GetRequiredService<ILogger<ProcessAudioWorkerClient>>()));
+        services.AddSingleton<IAudioSeparationEngine, DemucsSeparationEngine>();
+        services.AddSingleton<IAudioTranscriptionEngine, BasicPitchTranscriptionEngine>();
+        var intelligenceTemp = new AudioIntelligenceTempManager(paths.AudioIntelligenceTempDirectory);
+        try { intelligenceTemp.CleanupOrphansAsync(TimeSpan.FromDays(1)).GetAwaiter().GetResult(); }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+        services.AddSingleton<IAudioIntelligenceTempManager>(intelligenceTemp);
+        services.AddSingleton<IAiResourceGate>(_ => new AiResourceGate(Math.Max(1, startupSettings.AudioIntelligence.MaximumParallelJobs)));
+        services.AddSingleton<IAudioIntelligenceWorkflow>(serviceProvider => new AudioIntelligenceWorkflow(
+            serviceProvider.GetRequiredService<IAudioSeparationEngine>(), serviceProvider.GetRequiredService<IAudioTranscriptionEngine>(),
+            serviceProvider.GetRequiredService<IAudioDecoder>(), serviceProvider.GetRequiredService<IAudioIntelligenceTempManager>(),
+            serviceProvider.GetRequiredService<IAiResourceGate>(), paths.AudioIntelligenceAssetDirectory));
         services.AddTransient<AudioLabViewModel>();
         services.AddSingleton<IMidiFileImporter, DryWetMidiFileImporter>();
         services.AddSingleton<IShawzinPitchMapper, ShawzinPitchMapper>();

@@ -21,6 +21,9 @@ public sealed record AppSettings
     /// <summary>Gets audio decoder, output and cache preferences.</summary>
     public AudioSettings Audio { get; init; } = new();
 
+    /// <summary>Gets optional local worker and resource preferences.</summary>
+    public AudioIntelligenceSettings AudioIntelligence { get; init; } = new();
+
     /// <summary>Gets local opt-in and timing preferences for the optional GameBridge.</summary>
     public GameBridgeSettings GameBridge { get; init; } = new();
 }
@@ -62,6 +65,16 @@ public sealed record AudioSettings
     public string? FfmpegExecutablePath { get; init; }
     public string? FfprobeExecutablePath { get; init; }
     public string? FfplayExecutablePath { get; init; }
+}
+
+public sealed record AudioIntelligenceSettings
+{
+    public string? PythonExecutablePath { get; init; }
+    public string? WorkerScriptPath { get; init; }
+    public int MaximumParallelJobs { get; init; } = 1;
+    public int WorkerTimeoutMinutes { get; init; } = 120;
+    public string SeparationEngine { get; init; } = "demucs";
+    public string TranscriptionEngine { get; init; } = "basic-pitch";
 }
 
 /// <summary>Contains safe defaults for the optional external-input adapter.</summary>

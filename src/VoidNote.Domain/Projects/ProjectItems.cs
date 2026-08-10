@@ -35,10 +35,9 @@ public sealed class AudioSource : ProjectAsset
     [JsonIgnore] public string? ResolvedPath { get; set; }
 }
 
-/// <summary>Represents a separated stem entry without implementing separation.</summary>
-public sealed class Stem : ProjectAsset
+/// <summary>Preserves pre-v2 placeholder stem references that cannot be upgraded into a complete StemSet.</summary>
+public sealed class LegacyStemReference : ProjectAsset
 {
-    /// <summary>Gets or initializes the source audio item, when known.</summary>
     public Guid? SourceAudioId { get; init; }
 }
 

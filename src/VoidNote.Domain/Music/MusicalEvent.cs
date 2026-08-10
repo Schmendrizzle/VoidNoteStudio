@@ -1,3 +1,5 @@
+using VoidNote.Domain.Audio;
+
 namespace VoidNote.Domain.Music;
 
 /// <summary>Identifies how a normalized musical event was created.</summary>
@@ -26,7 +28,8 @@ public sealed record MusicalEvent
         int pitch,
         int velocity,
         MusicalEventSource source,
-        decimal confidence)
+        decimal confidence,
+        AudioNoteProvenance? audioProvenance = null)
     {
         if (id == Guid.Empty) throw new ArgumentException("An event ID cannot be empty.", nameof(id));
         if (pitch is < 0 or > 127) throw new ArgumentOutOfRangeException(nameof(pitch));
@@ -40,6 +43,7 @@ public sealed record MusicalEvent
         Velocity = velocity;
         Source = source;
         Confidence = confidence;
+        AudioProvenance = audioProvenance;
     }
 
     /// <summary>Gets the stable event identifier.</summary>
@@ -56,4 +60,6 @@ public sealed record MusicalEvent
     public MusicalEventSource Source { get; }
     /// <summary>Gets the source confidence from zero through one.</summary>
     public decimal Confidence { get; }
+    /// <summary>Gets durable transcription origin and raw timing, when this note came from audio.</summary>
+    public AudioNoteProvenance? AudioProvenance { get; }
 }

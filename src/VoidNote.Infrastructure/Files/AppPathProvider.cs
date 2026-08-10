@@ -31,4 +31,10 @@ public sealed class AppPathProvider : IAppPathProvider
 
     /// <inheritdoc />
     public string WaveformCacheDirectory => Path.Combine(_rootDirectory, "cache", "waveforms");
+
+    /// <inheritdoc />
+    public string AudioIntelligenceTempDirectory => Path.Combine(_rootDirectory, "temp", "audio-intelligence");
+
+    /// <inheritdoc />
+    public string AudioIntelligenceAssetDirectory => Path.Combine(_rootDirectory, "derived", "audio-intelligence");
 }

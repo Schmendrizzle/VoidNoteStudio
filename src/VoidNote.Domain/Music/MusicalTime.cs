@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace VoidNote.Domain.Music;
 
 /// <summary>Represents a non-negative position or duration in timeline ticks.</summary>
@@ -6,6 +8,7 @@ public readonly record struct MusicalTime
     /// <summary>Creates a musical time value.</summary>
     /// <param name="ticks">The number of timeline ticks.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="ticks"/> is negative.</exception>
+    [JsonConstructor]
     public MusicalTime(long ticks)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(ticks);

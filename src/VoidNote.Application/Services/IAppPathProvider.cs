@@ -14,4 +14,10 @@ public interface IAppPathProvider
 
     /// <summary>Gets the local, user-clearable waveform cache directory.</summary>
     string WaveformCacheDirectory { get; }
+
+    /// <summary>Gets the VoidNote-owned root for isolated AI worker jobs.</summary>
+    string AudioIntelligenceTempDirectory { get; }
+
+    /// <summary>Gets storage for derived assets before they are embedded in a project.</summary>
+    string AudioIntelligenceAssetDirectory { get; }
 }

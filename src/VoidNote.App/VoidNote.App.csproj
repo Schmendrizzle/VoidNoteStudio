@@ -19,4 +19,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\workers\python\voidnote_ai_worker.py" Link="workers\python\voidnote_ai_worker.py" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

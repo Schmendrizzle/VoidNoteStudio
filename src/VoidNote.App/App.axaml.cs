@@ -32,7 +32,7 @@ public sealed class App(IServiceProvider services) : Avalonia.Application
                 viewModel.AudioLab.DisposeAsync().AsTask().GetAwaiter().GetResult();
                 _services.GetRequiredService<GameBridgePlaybackSession>().StopAsync().GetAwaiter().GetResult();
             };
-            _services.GetRequiredService<ILogger<App>>().LogInformation("VoidNote Studio Milestone G started.");
+            _services.GetRequiredService<ILogger<App>>().LogInformation("VoidNote Studio Milestone H started.");
         }
 
         base.OnFrameworkInitializationCompleted();

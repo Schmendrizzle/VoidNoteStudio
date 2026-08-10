@@ -7,6 +7,7 @@ using VoidNote.Application.Jobs;
 using VoidNote.Audio.Import;
 using VoidNote.Audio.Playback;
 using VoidNote.Audio.Waveforms;
+using VoidNote.Audio.Intelligence;
 using VoidNote.Domain.Audio;
 using VoidNote.Domain.Music;
 using VoidNote.Domain.Projects;
@@ -19,19 +20,29 @@ public sealed class AudioLabViewModel : INotifyPropertyChanged, IAsyncDisposable
     private readonly IAudioImportService _import; private readonly IWaveformGenerator _waveforms; private readonly IWaveformCache _cache;
     private readonly IBackgroundJobManager _jobs; private readonly IAudioDeviceProvider _devices; private readonly AudioPlaybackEngine _playback;
     private readonly IUndoRedoService _history; private readonly ILogger<AudioLabViewModel> _logger; private CancellationTokenSource? _operation;
+    private readonly IAudioIntelligenceWorkflow _intelligence; private readonly IAudioSeparationEngine _separationEngine; private readonly IAudioTranscriptionEngine _transcriptionEngine;
+    private readonly AudioStemMixPreview _stemMix;
     private IReadOnlyList<AudioTrackRowViewModel> _tracks = []; private AudioTrackRowViewModel? _selected; private WaveformData? _waveform;
+    private IReadOnlyList<StemRowViewModel> _stems = []; private StemRowViewModel? _selectedStem;
     private string _status = "Import WAV, FLAC or MP3 audio to begin."; private double _progress; private double _zoom = 1;
     private double _playhead; private double _selectionStart; private double _selectionEnd;
+    private string _engineStatus = "AI engines not checked."; private string _transcriptionMetrics = "No transcription result.";
+    private TranscriptionMode _transcriptionMode = TranscriptionMode.Auto; private TranscriptionQuantization _quantization; private ComputeDevicePreference _device = ComputeDevicePreference.Auto;
+    private decimal _confidenceThreshold = 0.60m;
 
     public AudioLabViewModel(IAudioImportService import, IWaveformGenerator waveforms, IWaveformCache cache,
         IBackgroundJobManager jobs, IAudioDeviceProvider devices, AudioPlaybackEngine playback,
-        IUndoRedoService history, ILogger<AudioLabViewModel> logger)
-    { _import = import; _waveforms = waveforms; _cache = cache; _jobs = jobs; _devices = devices; _playback = playback; _history = history; _logger = logger; }
+        IUndoRedoService history, AudioStemMixPreview stemMix, IAudioIntelligenceWorkflow intelligence, IAudioSeparationEngine separationEngine,
+        IAudioTranscriptionEngine transcriptionEngine, ILogger<AudioLabViewModel> logger)
+    { _import = import; _waveforms = waveforms; _cache = cache; _jobs = jobs; _devices = devices; _playback = playback; _history = history;
+        _stemMix = stemMix; _intelligence = intelligence; _separationEngine = separationEngine; _transcriptionEngine = transcriptionEngine; _logger = logger; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public VoidNoteProject Project { get; } = new();
     public IReadOnlyList<AudioTrackRowViewModel> Tracks { get => _tracks; private set => Set(ref _tracks, value); }
     public AudioTrackRowViewModel? SelectedTrack { get => _selected; set { if (Set(ref _selected, value)) _ = LoadWaveformAsync(); } }
+    public IReadOnlyList<StemRowViewModel> Stems { get => _stems; private set => Set(ref _stems, value); }
+    public StemRowViewModel? SelectedStem { get => _selectedStem; set => Set(ref _selectedStem, value); }
     public WaveformData? Waveform { get => _waveform; private set { if (Set(ref _waveform, value)) OnPropertyChanged(nameof(WaveformWidth)); } }
     public string Status { get => _status; private set => Set(ref _status, value); }
     public double Progress { get => _progress; private set => Set(ref _progress, value); }
@@ -44,6 +55,19 @@ public sealed class AudioLabViewModel : INotifyPropertyChanged, IAsyncDisposable
     public double DurationSeconds => SelectedTrack?.Source.Format.Duration.Seconds is decimal value ? (double)value : 0;
     public string DeviceCapability => $"{_devices.Capability.Backend}: {_devices.Capability.Description}";
     public AudioRegion Region { get; } = new() { Name = "Audio Lab selection" };
+    public string EngineStatus { get => _engineStatus; private set => Set(ref _engineStatus, value); }
+    public string TranscriptionMetrics { get => _transcriptionMetrics; private set => Set(ref _transcriptionMetrics, value); }
+    public IReadOnlyList<TranscriptionMode> TranscriptionModes { get; } = Enum.GetValues<TranscriptionMode>();
+    public IReadOnlyList<TranscriptionQuantization> Quantizations { get; } = Enum.GetValues<TranscriptionQuantization>();
+    public IReadOnlyList<ComputeDevicePreference> ComputeDevices { get; } = Enum.GetValues<ComputeDevicePreference>();
+    public IReadOnlyList<string> SeparationEngines => [_separationEngine.Id];
+    public IReadOnlyList<string> TranscriptionEngines => [_transcriptionEngine.Id];
+    public string SelectedSeparationEngine => _separationEngine.Id;
+    public string SelectedTranscriptionEngine => _transcriptionEngine.Id;
+    public TranscriptionMode TranscriptionMode { get => _transcriptionMode; set => Set(ref _transcriptionMode, value); }
+    public TranscriptionQuantization Quantization { get => _quantization; set => Set(ref _quantization, value); }
+    public ComputeDevicePreference ComputeDevice { get => _device; set => Set(ref _device, value); }
+    public decimal ConfidenceThreshold { get => _confidenceThreshold; set => Set(ref _confidenceThreshold, Math.Clamp(value, 0, 1)); }
 
     public async Task ImportAsync(string path, CancellationToken token = default)
     {
@@ -62,6 +86,90 @@ public sealed class AudioLabViewModel : INotifyPropertyChanged, IAsyncDisposable
         catch (OperationCanceledException) { Status = "Audio import cancelled."; }
         catch (Exception exception) { _logger.LogError(exception, "Audio import failed"); Status = exception.Message; }
     }
+
+    public async Task DiscoverEnginesAsync(CancellationToken token = default)
+    {
+        var separation = await _separationEngine.DiscoverAsync(token); var transcription = await _transcriptionEngine.DiscoverAsync(token);
+        EngineStatus = $"Separation: {separation.State} {separation.Version ?? string.Empty} [{separation.ExecutablePath ?? "no environment path"}] ({(separation.Capabilities.IsGpuAvailable ? "GPU available" : "CPU")}) Â· Transcription: {transcription.State} {transcription.Version ?? string.Empty} [{transcription.ExecutablePath ?? "no environment path"}]";
+    }
+
+    public async Task SeparateAsync(CancellationToken token = default)
+    {
+        if (SelectedTrack is null) { Status = "Select an original audio source first."; return; }
+        CancelOperation(); _operation = CancellationTokenSource.CreateLinkedTokenSource(token);
+        try
+        {
+            var regionId = PrepareRegion();
+            IProgress<AudioIntelligenceProgress> progress = new Progress<AudioIntelligenceProgress>(value => { Progress = value.Fraction; Status = $"{value.Stage}: {value.Message}"; });
+            var set = await _jobs.RunAsync("Stem separation", async (jobProgress, cancellation) =>
+                await _intelligence.SeparateAsync(Project, SelectedTrack.Source.Id, regionId, new("htdemucs", ComputeDevice),
+                    new InlineProgress<AudioIntelligenceProgress>(value => { progress.Report(value); jobProgress.Report(new(value.Fraction, value.Stage.ToString())); }), cancellation), _operation.Token);
+            RefreshTracks(); Stems = Project.StemSets.SelectMany(value => value.StemTracks).Select(value => new StemRowViewModel(value)).ToArray();
+            SelectedStem = Stems.FirstOrDefault(value => value.Model.Type == StemType.Bass) ?? Stems.FirstOrDefault();
+            Status = $"Created {set.StemTracks.Count} non-destructive stems.";
+        }
+        catch (OperationCanceledException) { Status = "Stem separation cancelled."; }
+        catch (Exception exception) { _logger.LogError(exception, "Stem separation failed"); Status = exception.Message; }
+    }
+
+    public async Task TranscribeAsync(CancellationToken token = default)
+    {
+        if (SelectedStem is null && SelectedTrack is null) { Status = "Select audio or a stem first."; return; }
+        CancelOperation(); _operation = CancellationTokenSource.CreateLinkedTokenSource(token);
+        try
+        {
+            var sourceId = SelectedStem?.Model.AudioSourceId ?? SelectedTrack!.Source.Id;
+            var stemId = SelectedStem?.Model.Id; var regionId = stemId.HasValue ? null : PrepareRegion();
+            var settings = new AudioTranscriptionSettings
+            {
+                Mode = TranscriptionMode, MediumConfidenceThreshold = ConfidenceThreshold,
+                HighConfidenceThreshold = Math.Max(0.85m, ConfidenceThreshold), ConfidenceFilter = ConfidenceFilterMode.MinimumThreshold,
+                MinimumConfidence = ConfidenceThreshold, Quantization = Quantization, RemoveGhostNotes = true,
+                MergeAdjacentNotes = true, DetectDuplicates = true, MarkPitchOutliers = true,
+            };
+            IProgress<AudioIntelligenceProgress> progress = new Progress<AudioIntelligenceProgress>(value => { Progress = value.Fraction; Status = $"{value.Stage}: {value.Message}"; });
+            var result = await _jobs.RunAsync("Audio to MIDI", async (jobProgress, cancellation) =>
+                await _intelligence.TranscribeAsync(Project, sourceId, stemId, regionId, new(settings, ComputeDevice),
+                    new InlineProgress<AudioIntelligenceProgress>(value => { progress.Report(value); jobProgress.Report(new(value.Fraction, value.Stage.ToString())); }), cancellation), _operation.Token);
+            var report = result.Report;
+            TranscriptionMetrics = $"{report.KeptNotes}/{report.DetectedNotes} notes Â· avg confidence {report.AverageConfidence:P0} Â· high {report.HighConfidenceCount} / medium {report.MediumConfidenceCount} / low {report.LowConfidenceCount} Â· density {report.NoteDensityPerSecond:F2}/s";
+            Status = $"Created editable MIDI track '{result.Track.Name}'.";
+        }
+        catch (OperationCanceledException) { Status = "Audio transcription cancelled."; }
+        catch (Exception exception) { _logger.LogError(exception, "Audio transcription failed"); Status = exception.Message; }
+    }
+
+    public void CompareOriginal()
+    {
+        var derived = Project.StemSets.SelectMany(value => value.StemTracks).Select(value => value.AudioSourceId).ToHashSet();
+        SelectedTrack = Tracks.FirstOrDefault(value => !derived.Contains(value.Source.Id));
+    }
+
+    public void CompareStem()
+    {
+        if (SelectedStem is null) return;
+        SelectedTrack = Tracks.FirstOrDefault(value => value.Source.Id == SelectedStem.Model.AudioSourceId);
+    }
+
+    public void RemoveSelectedStemSet()
+    {
+        if (SelectedStem is null) return;
+        var set = Project.StemSets.Single(value => value.Id == SelectedStem.Model.StemSetId);
+        _history.Execute(new RemoveStemSetCommand(Project, set));
+        RefreshTracks(); Stems = Project.StemSets.SelectMany(value => value.StemTracks).Select(value => new StemRowViewModel(value)).ToArray();
+        SelectedStem = Stems.FirstOrDefault(); Status = "Stem set removed from the project; Undo can restore it.";
+    }
+
+    public async Task PlayStemMixAsync(CancellationToken token = default)
+    {
+        var sourceIds = Project.StemSets.SelectMany(value => value.StemTracks).Select(value => value.AudioSourceId).ToHashSet();
+        var tracks = Project.AudioTracks.Where(track => track.Clips.Any(clip => sourceIds.Contains(clip.SourceId))).ToArray();
+        try { _ = ObserveStemMixAsync(_stemMix.PlayAsync(Project, tracks, token)); Status = "Playing audible stem combination (preview synchronization)."; }
+        catch (Exception exception) { Status = exception.Message; }
+        await Task.CompletedTask;
+    }
+
+    private async Task ObserveStemMixAsync(Task run) { try { await run; Status = "Stem mix playback complete."; } catch (OperationCanceledException) { } catch (Exception exception) { _logger.LogError(exception, "Stem mix playback failed"); Status = exception.Message; } }
 
     public async Task LoadWaveformAsync(CancellationToken token = default)
     {
@@ -102,12 +210,23 @@ public sealed class AudioLabViewModel : INotifyPropertyChanged, IAsyncDisposable
     public void CancelOperation() { _operation?.Cancel(); _operation?.Dispose(); _operation = null; }
     public void RefreshPlaybackPosition() { if (_playback.State != AudioPlaybackState.Stopped || _playback.Position.Seconds > 0) PlayheadSeconds = (double)_playback.Position.Seconds; }
     private void UpdateRegion() { var start = Math.Min(SelectionStartSeconds, SelectionEndSeconds); var end = Math.Max(SelectionStartSeconds, SelectionEndSeconds); Region.Start = new((decimal)start); Region.End = new((decimal)end); }
+    private Guid? PrepareRegion()
+    {
+        UpdateRegion(); if (Region.Duration.Seconds <= 0) return null;
+        if (!Project.AudioRegions.Contains(Region)) Project.AudioRegions.Add(Region); return Region.Id;
+    }
     private void RefreshTracks() { Tracks = Project.AudioTracks.Select(track => new AudioTrackRowViewModel(Project, track, _history, RefreshTracks)).ToArray(); SelectedTrack = Tracks.FirstOrDefault(); }
     private async Task ObservePlaybackAsync(Task run) { try { await run; Status = "Audio playback complete."; } catch (Exception exception) { _logger.LogError(exception, "Audio playback failed"); Status = exception.Message; } }
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; OnPropertyChanged(name); return true; }
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
     private sealed class InlineProgress<T>(Action<T> callback) : IProgress<T> { public void Report(T value) => callback(value); }
-    public async ValueTask DisposeAsync() { CancelOperation(); await _playback.DisposeAsync(); }
+    public async ValueTask DisposeAsync() { CancelOperation(); await _stemMix.DisposeAsync(); await _playback.DisposeAsync(); }
+}
+
+public sealed record StemRowViewModel(Stem Model)
+{
+    public string Name => Model.Name;
+    public string Details => $"{Model.Type} Â· {Model.Engine} {Model.EngineVersion} Â· offset {Model.StartOffset.Seconds:F2}s Â· duration {Model.Duration.Seconds:F2}s";
 }
 
 public sealed class AudioTrackRowViewModel : INotifyPropertyChanged
