@@ -5,7 +5,10 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\VoidNote.Application\VoidNote.Application.csproj" />
+    <ProjectReference Include="..\VoidNote.Domain\VoidNote.Domain.csproj" />
     <ProjectReference Include="..\VoidNote.Infrastructure\VoidNote.Infrastructure.csproj" />
+    <ProjectReference Include="..\VoidNote.Midi\VoidNote.Midi.csproj" />
+    <ProjectReference Include="..\VoidNote.Shawzin\VoidNote.Shawzin.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" />

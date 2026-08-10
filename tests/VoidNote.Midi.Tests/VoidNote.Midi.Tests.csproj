@@ -4,6 +4,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\VoidNote.Midi\VoidNote.Midi.csproj" />
     <ProjectReference Include="..\..\src\VoidNote.Application\VoidNote.Application.csproj" />
+    <ProjectReference Include="..\..\src\VoidNote.Shawzin\VoidNote.Shawzin.csproj" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio"><PrivateAssets>all</PrivateAssets></PackageReference>

@@ -75,7 +75,15 @@ Der Import normalisiert PPQ, Tempo, Taktarten, Tracknamen und Noten. Der Standar
 
 Der Decoder liefert strukturierte Ergebnisse mit Fehlerkategorie, Codeposition, Symbol und Eventindex. Der Encoder ist deterministisch, validiert vor dem Schreiben und meldet jede notwendige 1/16-Sekunden-Quantisierung. Unvollständige Events, ungültige Zeichen, nicht klingende Spielsymbole, rückläufige oder gleiche Timestamps, nicht darstellbare Chords, Bereichsüberschreitungen und Quantisierungskollisionen werden abgelehnt. Die vollständige Wire-Spezifikation, Annahmen und Quellen stehen in `docs/shawzin-code-format.md`.
 
-Der Milestone enthält ausdrücklich keine MIDI-zu-Shawzin-Zuordnung, Skalenwahl, Compatibility-Bewertung, virtuelle Wiedergabe oder GameBridge-Logik.
+Der Codec bleibt von MIDI-Zuordnung, Skalenwahl, Compatibility-Bewertung und Wiedergabe getrennt. Diese Aufgaben liegen in eigenständigen Milestone-D-Services.
+
+## Shawzin Composer und Arranger
+
+`ShawzinDefinition` verbindet ein wiederverwendbares physisches `ShawzinPlayProfile` mit einem unabhängigen `ShawzinSoundProfile`. Skalen enthalten geordnete Pitch-/Input-Positionen; Algorithmen besitzen keine instrumentabhängigen Switch-Blöcke. Die eingebauten Dax- und Nelumbo-Definitionen teilen dasselbe Spielprofil, aber nicht ihr Klangprofil.
+
+`IShawzinPitchMapper`, `IShawzinCompatibilityAnalyzer`, `IShawzinScaleAnalyzer`, `IShawzinTranspositionAnalyzer` und `IShawzinArranger` arbeiten ausschließlich auf Domainmodellen. Der Arranger erzeugt einen `ShawzinTrack` und einen vollständigen `ArrangementReport`. Die Application-Schicht koordiniert über `IShawzinStudioWorkflow` MIDI-Import, Analyse, Arrangement, Encoder und Preview; die Avalonia-View enthält nur Darstellung und plattformspezifische Datei-/Clipboard-Auswahl.
+
+`ShawzinPlaybackEngine` plant alle Anschläge relativ zu einem einzigen monotonic-clock-Anker und gibt ausschließlich über `IShawzinPlaybackOutput` aus. Sie kennt weder Avalonia noch Betriebssystemeingaben. `SyntheticShawzinPreviewRenderer` erzeugt eigenständiges Mono-PCM-WAV aus synthetischen Pluck-Tönen und verwendet keine Warframe-Audiodateien. Ausführliche Regeln stehen in `docs/shawzin.md` und `docs/shawzin-arrangement.md`.
 
 ## Playback und Geräte
 
@@ -91,7 +99,7 @@ Der Milestone enthält ausdrücklich keine MIDI-zu-Shawzin-Zuordnung, Skalenwahl
 
 Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `project.json`; Settings und Projekte werden atomar geschrieben; Logging bleibt lokal und ohne Telemetrie; Undo/Redo bleibt UI-unabhängig. Ältere Version-1-Projekte ohne Taktarten-Map erhalten beim Laden die Default-Taktart 4/4.
 
-## Bewusst offene Punkte nach Milestone C
+## Bewusst offene Punkte nach Milestone D
 
 - MIDI-Kanäle, Program Changes, Controller, Marker und SysEx sind noch nicht Teil des normalisierten Domain-Modells.
 - SMPTE-Time-Division wird abgelehnt; der MIDI Core verwendet PPQ.
@@ -102,4 +110,6 @@ Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `p
 - Migration, Autosave und Crash Recovery bleiben spätere Foundation-Erweiterungen.
 - Digital Extremes veröffentlicht keine normative Shawzin-Wire-Spezifikation; UI-/Chat-/Versionsgrenzen für 100, 1000 oder 1666 Noten sind von der strukturellen 4096-Timestamp-Grenze getrennt dokumentiert.
 - Slow Playback ist nicht im Songcode markiert und wird deshalb nicht als implizite zweite Codec-Zeitbasis behandelt.
-- Shawzin-Pitchprojektion, Instrumentprofile, Arrangierung, Compatibility-Analyse und Playback folgen erst in Milestone D oder später.
+- Das eingebaute Standard-Spielprofil ist eine dokumentierte, erweiterbare VoidNote-Projektion; die Community-/Spielvalidierung weiterer Tunings und Instrumentvarianten bleibt offen.
+- Die minimale UI rendert eine synthetische WAV-Vorschau zum Speichern. Ein plattformübergreifender Live-Audio-Geräteadapter ist noch nicht enthalten; virtuelle Event-Wiedergabe und Preview-Rendering sind vollständig gekapselt.
+- Keine GameBridge, OS-Eingabesimulation, globalen Hotkeys oder Multi-Shawzin-Aufteilung sind implementiert.

@@ -4,9 +4,7 @@
              RequestedThemeVariant="Default">
   <Application.Resources>
     <x:String x:Key="AppName">VoidNote Studio</x:String>
-    <x:String x:Key="FoundationHeading">Foundation ready</x:String>
-    <x:String x:Key="FoundationDescription">The project model, timeline, settings, logging, and undo/redo services are initialized.</x:String>
-    <x:String x:Key="MilestoneLabel">Milestone A</x:String>
+    <x:String x:Key="MilestoneLabel">Milestone D</x:String>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />

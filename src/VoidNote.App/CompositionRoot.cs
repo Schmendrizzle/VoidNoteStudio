@@ -4,11 +4,18 @@ using VoidNote.Application.Commands;
 using VoidNote.Application.Projects;
 using VoidNote.Application.Services;
 using VoidNote.Application.Settings;
+using VoidNote.Application.Shawzin;
 using VoidNote.App.ViewModels;
 using VoidNote.Infrastructure.Files;
 using VoidNote.Infrastructure.Logging;
 using VoidNote.Infrastructure.Projects;
 using VoidNote.Infrastructure.Settings;
+using VoidNote.Midi;
+using VoidNote.Shawzin.Analysis;
+using VoidNote.Shawzin.Arrangement;
+using VoidNote.Shawzin.Codec;
+using VoidNote.Shawzin.Mapping;
+using VoidNote.Shawzin.Preview;
 
 namespace VoidNote.App;
 
@@ -23,6 +30,15 @@ internal static class CompositionRoot
         services.AddSingleton<ISettingsStore, JsonSettingsStore>();
         services.AddSingleton<IProjectStore, VnsProjectStore>();
         services.AddSingleton<IUndoRedoService, UndoRedoService>();
+        services.AddSingleton<IMidiFileImporter, DryWetMidiFileImporter>();
+        services.AddSingleton<IShawzinPitchMapper, ShawzinPitchMapper>();
+        services.AddSingleton<IShawzinCompatibilityAnalyzer, ShawzinCompatibilityAnalyzer>();
+        services.AddSingleton<IShawzinScaleAnalyzer, ShawzinScaleAnalyzer>();
+        services.AddSingleton<IShawzinTranspositionAnalyzer, ShawzinTranspositionAnalyzer>();
+        services.AddSingleton<IShawzinArranger, ShawzinArranger>();
+        services.AddSingleton<IShawzinCodeEncoder, WarframeShawzinCodeEncoder>();
+        services.AddSingleton<IShawzinPreviewRenderer, SyntheticShawzinPreviewRenderer>();
+        services.AddSingleton<IShawzinStudioWorkflow, ShawzinStudioWorkflow>();
         services.AddTransient<MainWindowViewModel>();
         services.AddLogging(builder =>
         {

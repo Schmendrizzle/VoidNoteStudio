@@ -1,29 +1,59 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:VoidNote.App.ViewModels"
+        xmlns:projects="using:VoidNote.Domain.Projects"
+        xmlns:shawzin="using:VoidNote.Domain.Shawzin"
         x:Class="VoidNote.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
         Title="{DynamicResource AppName}"
-        Width="1000"
-        Height="650"
-        MinWidth="720"
-        MinHeight="480">
+        Width="1100" Height="720" MinWidth="820" MinHeight="560">
   <Grid RowDefinitions="Auto,*">
     <Border Padding="24,18" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
       <Grid ColumnDefinitions="*,Auto">
-        <TextBlock Text="{DynamicResource AppName}" FontSize="24" FontWeight="SemiBold" />
-        <Border Grid.Column="1" Padding="12,6" CornerRadius="12"
-                Background="{DynamicResource SystemAccentColor}">
+        <StackPanel>
+          <TextBlock Text="{DynamicResource AppName}" FontSize="24" FontWeight="SemiBold" />
+          <TextBlock Text="Shawzin Studio" Opacity="0.7" />
+        </StackPanel>
+        <Border Grid.Column="1" Padding="12,6" CornerRadius="12" Background="{DynamicResource SystemAccentColor}">
           <TextBlock Text="{DynamicResource MilestoneLabel}" Foreground="White" />
         </Border>
       </Grid>
     </Border>
-    <Grid Grid.Row="1" Margin="48">
-      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="560" Spacing="14">
-        <TextBlock Text="{DynamicResource FoundationHeading}"
-                   FontSize="32" FontWeight="SemiBold" TextAlignment="Center" />
-        <TextBlock Text="{DynamicResource FoundationDescription}"
-                   FontSize="16" TextAlignment="Center" TextWrapping="Wrap"
-                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
-      </StackPanel>
-    </Grid>
+    <ScrollViewer Grid.Row="1">
+      <Grid Margin="28" ColumnDefinitions="320,*" ColumnSpacing="28">
+        <StackPanel Spacing="12">
+          <Button Content="Open MIDI…" Click="OpenMidi_Click" />
+          <TextBlock Text="Track" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="projects:MidiTrack"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock Text="Instrument" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{Binding Instruments}" SelectedItem="{Binding SelectedInstrument}">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="shawzin:ShawzinDefinition"><TextBlock Text="{Binding DisplayName}" /></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock Text="Scale" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{Binding Scales}" SelectedItem="{Binding SelectedScale}" />
+          <TextBlock Text="Arrangement strategy" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{Binding Strategies}" SelectedItem="{Binding SelectedStrategy}">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:StrategyChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Content="Analyze" Click="Analyze_Click" />
+            <Button Grid.Column="1" Content="Arrange" Click="Arrange_Click" />
+          </Grid>
+          <Button Content="Save synthetic WAV preview…" IsEnabled="{Binding HasPreview}" Click="SavePreview_Click" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Spacing="14">
+          <TextBlock Text="Compatibility" FontSize="20" FontWeight="SemiBold" />
+          <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+            <TextBlock Text="{Binding Compatibility}" TextWrapping="Wrap" />
+          </Border>
+          <TextBlock Text="Generated Shawzin code" FontSize="20" FontWeight="SemiBold" />
+          <TextBox Text="{Binding SongCode}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="180" />
+          <Button Content="Copy code" HorizontalAlignment="Left" Click="CopyCode_Click" />
+          <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.75" />
+        </StackPanel>
+      </Grid>
+    </ScrollViewer>
   </Grid>
 </Window>

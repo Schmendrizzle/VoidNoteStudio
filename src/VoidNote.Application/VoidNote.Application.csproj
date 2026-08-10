@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\VoidNote.Domain\VoidNote.Domain.csproj" />
+    <ProjectReference Include="..\VoidNote.Midi\VoidNote.Midi.csproj" />
+    <ProjectReference Include="..\VoidNote.Shawzin\VoidNote.Shawzin.csproj" />
   </ItemGroup>
 </Project>

@@ -9,12 +9,12 @@ Digital Extremes dokumentiert die Shawzin-Funktion, Skalen, Akkorde, Aufnahme, T
 ## Grammatik und Alphabet
 
 ```text
-song-code = scale 1*4096event
+song-code = scale 1*event
 scale     = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 event     = note-symbol timestamp-high timestamp-low
 ```
 
-Nach dem einen Skalenzeichen muss mindestens ein vollständiges Drei-Zeichen-Event folgen. Bei streng eindeutigen Timestamps sind höchstens 4096 Events möglich.
+Nach dem einen Skalenzeichen muss mindestens ein vollständiges Drei-Zeichen-Event folgen. Die Zahl 4096 bezeichnet primär die Anzahl der durch 12 Bit darstellbaren Timestamp-Werte (`0..4095`), nicht ein separates Eventanzahlfeld im Code. Weil VoidNote für diese Variante strikt steigende Timestamps verlangt, kann ein kanonischer Track daraus abgeleitet höchstens 4096 Events enthalten.
 
 Für Note und Timestamp wird das Standard-Base64-Alphabet nur als geordnetes 64-Zeichen-Ziffernalphabet verwendet:
 
@@ -119,7 +119,7 @@ Fehler enthalten Kategorie, nullbasierte Position im Code, problematisches Symbo
 
 - Das Wire-Format speichert keine Notendauer oder Velocity. Ein Event ist ein Anschlag; Nachklang ist instrumentabhängig.
 - Slow Playback ist eine Warframe-Wiedergabeoption und besitzt im Code kein Variantensymbol. VoidNote interpretiert Timestamps im normalen 0,0625-Sekunden-Raster und vermischt Slow Playback nicht mit einer zweiten Zeitbasis.
-- Historische Quellen nennen je nach Warframe-Version und Übertragungsweg 100, 1000 oder 1666 Noten, während neuere Community-Editoren die 4096 Timestamp-Positionen nutzen. Diese Grenzen scheinen UI-, Chat-, Plattform- oder Versionsgrenzen zu sein und sind nicht selbst im Songcode kodiert. Milestone C erzwingt nur die strukturelle Grenze; ein späterer Exportkontext kann strengere Profile ergänzen.
+- Historische Quellen nennen je nach Warframe-Version und Übertragungsweg 100, 1000 oder 1666 Noten, während neuere Community-Editoren den vollständigen 12-Bit-Wertebereich mit 4096 möglichen Timestamp-Werten (`0..4095`) nutzen. Diese Grenzen scheinen UI-, Chat-, Plattform- oder Versionsgrenzen zu sein und sind nicht selbst im Songcode kodiert. Der Codec erzwingt nur die aus dem Timestamp-Bereich und der strikt steigenden Reihenfolge abgeleitete strukturelle Grenze; ein späterer Exportkontext kann strengere Profile ergänzen.
 - Einige permissive Parser akzeptieren nicht klingende Note-Symbole oder mehrdeutige Eventfolgen. VoidNote Recorded Song V1 ist absichtlich strikt und mischt diese Verhaltensvarianten nicht ein.
 - Digital Extremes stellt keine normative Formatspezifikation oder Kompatibilitätsgarantie bereit. Änderungen des Spiels müssen deshalb mit neuen Golden Fixtures geprüft und bei Inkompatibilität als explizite neue Variante gekapselt werden.
 
