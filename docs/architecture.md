@@ -1,8 +1,8 @@
-# VoidNote Studio – Architekturstand Milestone I
+# VoidNote Studio – Architekturstand Milestone J
 
 ## Geltungsbereich
 
-Dieses Dokument beschreibt die implementierte Architektur nach **Milestone I – Creator Mode**. Creator Mode orchestriert Timeline, Shawzin-Ensembles, Codeexport, Preview und die vorhandene GameBridge. Mandachord bleibt dem nächsten Milestone vorbehalten.
+Dieses Dokument beschreibt die implementierte Architektur nach **Milestone J – Mandachord Studio**. Mandachord ist ein eigenes Modul auf dem normalisierten Musikmodell und besitzt keinerlei GameBridge-/OS-Input-Pfad.
 
 ## Technische Basis
 
@@ -26,7 +26,7 @@ Dieses Dokument beschreibt die implementierte Architektur nach **Milestone I –
 | `VoidNote.Midi` | Gekapselter SMF-Import/-Export, Playback-Scheduler und Geräteverträge | Domain, DryWetMIDI |
 | `VoidNote.Audio` | Decoder, Waveform/Playback sowie engine-neutrale Audio-Intelligence-Ports, Workerprozessadapter, Separation-/Transkriptionsworkflow und nachvollziehbare Musiktransformationen | Domain, Microsoft.Extensions.Logging |
 | `VoidNote.Shawzin` | Codec, Mapping, Analyse, Arrangement, Preview sowie UI-unabhängige Multi-Shawzin-Trennung und Ensemble-Wiedergabe | Domain |
-| `VoidNote.Mandachord` | reservierte Modulgrenze; keine Arrangementlogik implementiert | keine |
+| `VoidNote.Mandachord` | Raster, Pitch-/Timing-Mapping, deterministische Reduction/Generation/Scoring, synthetische Preview, interner JSON- und MIDI-Export | Domain, MIDI |
 | `VoidNote.GameBridge` | Portable Input-Ports, Keybind-Profile, Mapping, Arm/Disarm, Diagnostik sowie getrennte Windows-/Linux-Adapter | Application, Domain, Shawzin |
 | `VoidNote.PluginContracts` | reservierte Assembly-Grenze; kein öffentliches Plugin-System implementiert | keine |
 
@@ -55,7 +55,15 @@ VoidNote.Domain ─────────────────> keine exter
 
 ## Zentrales Projekt- und Zeitmodell
 
-`VoidNoteProject` bleibt die versionierte Wurzel des normalisierten Modells (`formatVersion = 3`). Versionen 1 und 2 werden beim Laden in-memory migriert; vor dem ersten Speichern über eine ältere Datei entsteht einmalig eine versionsbezogene Sicherung. `MidiTrack` enthält `MusicalEvent`-Noten mit stabiler ID, Starttick, Dauer, Pitch, Velocity, Herkunft, Confidence und optionaler dauerhafter Audio-Provenienz.
+`VoidNoteProject` bleibt die versionierte Wurzel des normalisierten Modells (`formatVersion = 4`). Versionen 1, 2 und 3 werden beim Laden in-memory migriert; vor dem ersten Speichern über eine ältere Datei entsteht einmalig eine versionsbezogene Sicherung. `MidiTrack` enthält `MusicalEvent`-Noten mit stabiler ID, Starttick, Dauer, Pitch, Velocity, Herkunft, Confidence und optionaler dauerhafter Audio-Provenienz.
+
+`MandachordArrangements` und `MandachordSoundSets` sind eigenständige Projektbibliotheken. Ein Arrangement enthält mehrere Patterns und zeitlich zugeordnete Sections; jedes Pattern enthält Percussion-, Bass- und Melody-Steps mit dauerhafter Quell-/Generator-/Edit-Provenienz. Alle Section-Grenzen liegen auf derselben `ProjectTimeline` wie MIDI, Audio, Shawzin und Creator Mode.
+
+## Mandachord-Modul
+
+Der Datenfluss lautet `normalisierte Tracks/Analysemetadaten → IMandachordGenerator → Kandidaten + Report → Editor/Preview/Export`. Rohes `AudioRegion`-Audio wird nicht verarbeitet; der Eingang akzeptiert ausschließlich vorhandene Transkriptions- oder Rhythmus-/Onsetdaten. Der Generator erzeugt mindestens drei deterministische Varianten, quantisiert jeden Start unabhängig auf das 64-Step-Raster und meldet Pitch-, Timing-, Drop- und Kollisionsentscheidungen.
+
+`SyntheticMandachordPreviewRenderer` trennt Pattern und SoundSet und rendert eigene Sinus-/Noise-Stimmen. `PcmCombinedPreviewRenderer` kann kompatible synthetische Mono-PCM16-WAVs offline mischen. Das ist kein sample-genauer Live-Mix. MIDI-Export delegiert an den bestehenden MIDI-Adapter und erzeugt getrennte Percussion-, Bass- und Melody-Tracks. Der Export ist eine VoidNote-Repräsentation, kein Warframe-Format. Details: `docs/mandachord.md` und `docs/mandachord-generation.md`.
 
 `AudioSource` beschreibt immutable Quelldateien mit expliziter eingebetteter, relativer oder absoluter Referenz und formatunabhängigen Metadaten. `AudioTrack` enthält nicht-destruktive `AudioClip`-Platzierungen; deren `MusicalTime`-Start liegt auf derselben `ProjectTimeline` wie MIDI und Shawzin. Gain, Mute, Solo, Active, Trim-In und Dauer verändern die Originaldatei nicht. `AudioRegion` speichert Auswahl und Loop in präziser `AbsoluteTime`.
 
@@ -140,7 +148,7 @@ Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `p
 
 Creator Sessions sind Teil der Projektwurzel. Session, Takes, Sections, Statushistorie, Checklisten, Notizen, Range-Zuordnung und deterministische Sync-Metadaten werden in `project.json` persistiert. Die Domain bleibt frei von Avalonia, Audio-Engine-, GameBridge- und Videoabhängigkeiten. Application-Services planen, exportieren und koordinieren; die minimale Creator-Ansicht projiziert diese Services nur.
 
-## Bewusst offene Punkte nach Milestone I
+## Bewusst offene Punkte nach Milestone J
 
 - MIDI-Kanäle, Program Changes, Controller, Marker und SysEx sind noch nicht Teil des normalisierten Domain-Modells.
 - SMPTE-Time-Division wird abgelehnt; der MIDI Core verwendet PPQ.
@@ -165,3 +173,6 @@ Creator Sessions sind Teil der Projektwurzel. Session, Takes, Sections, Statushi
 - `Monophonic` wird beim Basic-Pitch-Adapter konservativ aus polyphonen Detektionen reduziert und vollständig reportet; ein spezialisiertes monophones Modell kann ohne Domainänderung ergänzt werden.
 - Audio- plus synthetische MIDI-Synchronvorschau ist noch nicht clock-gekoppelt. MIDI-Daten sind editier- und arrangierbar; der bestehende Shawzin-Previewpfad kann nach Arrangement separat verglichen werden.
 - GameBridge bleibt unverändert auf einen ausgewählten, bereits arrangierten Ensemble-Track begrenzt.
+- Die Mandachord-Oktavlage für Preview/MIDI ist eine dokumentierte VoidNote-Annahme; die verifizierten Community-Quellen normieren D-Moll-Pentatonik, vier 4/4-Takte, 120 BPM und 64 Sechzehntel, aber kein offizielles interchange-fähiges Pitch-/Share-Codeformat.
+- Es gibt absichtlich keinen Mandachord-GameBridge- oder OS-Input-Pfad und keine Behauptung eines nativen Warframe-Exports.
+- Die kompakte Milestone-J-UI ist ein Grid-Inspector; die zugrunde liegenden Editoroperationen unterstützen Mehrfachauswahl/Copy/Paste, ohne bereits eine Hochglanz-DAW-Darstellung zu versprechen.

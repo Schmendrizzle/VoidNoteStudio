@@ -2,6 +2,7 @@ using VoidNote.Domain.Music;
 using VoidNote.Domain.Shawzin;
 using VoidNote.Domain.Audio;
 using VoidNote.Domain.Creator;
+using VoidNote.Domain.Mandachord;
 
 namespace VoidNote.Domain.Projects;
 
@@ -9,7 +10,7 @@ namespace VoidNote.Domain.Projects;
 public sealed class VoidNoteProject
 {
     /// <summary>The project format version produced by this milestone.</summary>
-    public const int CurrentFormatVersion = 3;
+    public const int CurrentFormatVersion = 4;
 
     /// <summary>Gets or initializes the serialized format version.</summary>
     public int FormatVersion { get; init; } = CurrentFormatVersion;
@@ -54,6 +55,12 @@ public sealed class VoidNoteProject
     /// <summary>Gets or initializes normalized Mandachord tracks.</summary>
     public List<MandachordTrack> MandachordTracks { get; init; } = [];
 
+    /// <summary>Gets the project's Mandachord arrangement library.</summary>
+    public List<MandachordArrangement> MandachordArrangements { get; init; } = [];
+
+    /// <summary>Gets reusable, pattern-independent preview sound sets.</summary>
+    public List<MandachordSoundSet> MandachordSoundSets { get; init; } = [];
+
     /// <summary>Gets or initializes creator session shells.</summary>
     public List<CreatorSession> CreatorSessions { get; init; } = [];
 
@@ -86,6 +93,11 @@ public sealed class VoidNoteProject
             .Concat(MidiTracks)
             .Concat(ShawzinTracks)
             .Concat(MandachordTracks)
+            .Concat(MandachordArrangements)
+            .Concat(MandachordArrangements.SelectMany(value => value.Patterns))
+            .Concat(MandachordArrangements.SelectMany(value => value.Sections))
+            .Concat(MandachordArrangements.SelectMany(value => value.Patterns).SelectMany(value => value.Steps))
+            .Concat(MandachordSoundSets)
             .Concat(CreatorSessions)
             .Concat(CreatorSessions.SelectMany(session => session.Sections))
             .Concat(CreatorSessions.SelectMany(session => session.Takes))
@@ -124,5 +136,7 @@ public sealed class VoidNoteProject
         if (CreatorSessions.Any(session => session.ProjectId != Id))
             throw new InvalidOperationException("Every creator session must belong to this project.");
         foreach (var session in CreatorSessions) session.Validate();
+        foreach (var arrangement in MandachordArrangements) arrangement.Validate();
+        foreach (var soundSet in MandachordSoundSets) soundSet.Validate();
     }
 }

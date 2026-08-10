@@ -1,3 +1,6 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\VoidNote.Domain\VoidNote.Domain.csproj" />
+    <ProjectReference Include="..\VoidNote.Midi\VoidNote.Midi.csproj" />
+  </ItemGroup>
 </Project>

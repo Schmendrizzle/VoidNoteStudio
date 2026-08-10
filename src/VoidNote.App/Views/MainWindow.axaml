@@ -148,6 +148,9 @@
       <TabItem Header="Creator Mode">
         <views:CreatorModeView DataContext="{Binding CreatorMode}" />
       </TabItem>
+      <TabItem Header="Mandachord Studio">
+        <views:MandachordStudioView DataContext="{Binding MandachordStudio}" />
+      </TabItem>
     </TabControl>
   </Grid>
 </Window>

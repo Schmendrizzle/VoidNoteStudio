@@ -2,13 +2,15 @@
 
 ## Zweck und Grenzen
 
-Creator Mode plant getrennte Shawzin-, Audio- und MIDI-Aufnahmen für den späteren externen Videoschnitt. Er nimmt kein Video auf, integriert keine OBS-API und implementiert weder Mandachord noch eine zweite GameBridge oder Audio Engine. `FutureMandachord` ist ausschließlich ein vorbereiteter Source-Type.
+Creator Mode plant getrennte Shawzin-, Audio-, MIDI- und Mandachord-Aufnahmen für den späteren externen Videoschnitt. Er nimmt kein Video auf, integriert keine OBS-API und implementiert keine zweite GameBridge oder Audio Engine. Mandachord-Takes sind ausdrücklich manuelle Ingame-Performance-/Preview-Pläne; es gibt keinen Mandachord-OS-Input.
 
 ## Modell
 
 `CreatorSession` gehört über `ProjectId` zu genau einem `.vns`-Projekt und hält dessen `ProjectTimeline`, Erstellungs-/Änderungszeit, Takes, Sections, Sync-/Count-In-Einstellungen, Notizen und Songdauer. Mehrere Sessions können in `VoidNoteProject.CreatorSessions` liegen.
 
 `CreatorTake` bewahrt Quellen-ID/-Typ/-name, Audio-Intelligence-Provenienz, Instrument und Shawzin-Definition, Skala, Transposition, Arrangementstrategie, optionalen Songcode, Range, Status, Notizen, Versuchszahl, Timingoffset, Sync-Metadaten, erwartete Eventzahl, GameBridge-Bedarf und Checkliste. Statuswechsel landen zusätzlich in `StatusHistory` mit alter/neuer Ausprägung, Zeitpunkt und Grund.
+
+Mandachord-Takes ergänzen Arrangement-ID, Generation-Preset, SoundSet-ID und Section-Name. `RequiresGameBridge` bleibt dabei `false`. Count-In, Sync-Marker, Notes, Status, Retakes und Section-/Custom-Ranges verwenden unverändert dieselbe Creator-Infrastruktur.
 
 ## Wizard und Retakes
 
@@ -25,6 +27,8 @@ Unterstützt werden vier Beats, ein Takt, zwei Takte und eine benutzerdefinierte
 ```text
 Session Start → Pre-Roll → Count-In → Sync-Klickfolge → finales Sync-Signal → Music Start → Music End → Post-Roll End
 ```
+
+Zusätzlicher Flow:
 
 Die synthetische WAV-Spur ist mono, 16-Bit-PCM und enthält selbst erzeugte Sinuston-Klicks, ein tiefes finales Signal und optional einen kurzen Music-Start-Marker. Es werden keine geschützten Samples verwendet.
 
@@ -46,7 +50,7 @@ Diese Exporte dienen zugleich als neutrale Editor-Marker. Spätere editor-spezif
 
 ## Persistenz und Undo/Redo
 
-Projektformat 3 persistiert alle Creator-Daten in `project.json`. v1/v2 werden in-memory um leere Creator Sessions ergänzt; der bestehende Speichervorgang erstellt vor dem ersten Überschreiben eine versionsbezogene Sicherung. Undo/Redo-Kommandos decken Session/Take/Section hinzufügen und entfernen, Status, Notizen und Track Assignment ab. Retake-Historien werden nicht in-place ersetzt.
+Projektformat 4 persistiert alle Creator- und Mandachord-Daten in `project.json`. v1/v2/v3 werden in-memory ergänzt; der bestehende Speichervorgang erstellt vor dem ersten Überschreiben eine versionsbezogene Sicherung. Undo/Redo-Kommandos decken Session/Take/Section hinzufügen und entfernen, Status, Notizen, Track Assignment sowie Mandachord-Projektbearbeitungen ab. Retake-Historien werden nicht in-place ersetzt.
 
 ## Content-Creator-Workflow
 
@@ -54,4 +58,12 @@ Projektformat 3 persistiert alle Creator-Daten in `project.json`. v1/v2 werden i
 Polyphonic MIDI → Multi-Shawzin → unabhängige Ensemble-Tracks/Codes
 → Tracks im Wizard auswählen → Creator Session → Dry Run je Take
 → externe Aufnahme → Status/Notizen/Retakes → JSON/CSV/WAV in Videoschnitt
+```
+
+Zusätzlicher Flow:
+
+```text
+Stem/Audio-Transkription/MIDI/Shawzin-Quelle
+→ Mandachord-Kandidaten → Pattern/Section wählen
+→ Creator Take → Count-In → Sync → Preview oder manuelle Ingame-Performance
 ```

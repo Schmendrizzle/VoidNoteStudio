@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:VoidNote.App.ViewModels" xmlns:projects="using:VoidNote.Domain.Projects" xmlns:mandachord="using:VoidNote.Domain.Mandachord" x:Class="VoidNote.App.Views.MandachordStudioView" x:DataType="vm:MandachordStudioViewModel">
+  <ScrollViewer><Grid Margin="24" ColumnDefinitions="300,*" ColumnSpacing="24">
+    <StackPanel Spacing="10">
+      <TextBlock Text="MANDACHORD STUDIO" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock Text="Source" FontWeight="SemiBold" />
+      <ComboBox ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}"><ComboBox.ItemTemplate><DataTemplate x:DataType="projects:MidiTrack"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+      <TextBlock Text="Preset" FontWeight="SemiBold" /><ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}" />
+      <Button Content="Generate candidates" Click="Generate_Click" />
+      <ListBox ItemsSource="{Binding Candidates}" SelectedItem="{Binding SelectedCandidate}"><ListBox.ItemTemplate><DataTemplate x:DataType="vm:MandachordCandidateViewModel"><StackPanel Margin="4"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" /><TextBlock Text="{Binding Scores}" TextWrapping="Wrap" FontSize="11" /></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox>
+      <Button Content="Use candidate in project" Click="Accept_Click" /><Button Content="Preview loop" Click="Preview_Click" /><Button Content="Save synthetic WAV…" IsEnabled="{Binding HasPreview}" Click="Save_Click" /><Button Content="Clear grid" Click="Clear_Click" /><Button Content="Reset / Regenerate" Click="Reset_Click" />
+      <TextBlock Text="Quick grid edit" FontWeight="SemiBold" /><Grid ColumnDefinitions="*,*" ColumnSpacing="8"><NumericUpDown Minimum="0" Maximum="63" Value="{Binding EditStep}" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="4" Value="{Binding EditPitch}" /></Grid>
+      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6"><Button Content="Set kick" Click="SetKick_Click" /><Button Grid.Column="1" Content="Set bass" Click="SetBass_Click" /><Button Grid.Column="2" Content="Set melody" Click="SetMelody_Click" /></Grid>
+      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6"><Button Content="Delete drums" Click="DeleteDrums_Click" /><Button Grid.Column="1" Content="Delete bass" Click="DeleteBass_Click" /><Button Grid.Column="2" Content="Delete melody" Click="DeleteMelody_Click" /></Grid>
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.75" />
+    </StackPanel>
+    <StackPanel Grid.Column="1" Spacing="12">
+      <TextBlock Text="Percussion Grid" FontSize="18" FontWeight="SemiBold" /><ItemsControl ItemsSource="{Binding PercussionSteps}" HorizontalAlignment="Stretch"><ItemsControl.ItemTemplate><DataTemplate x:DataType="mandachord:MandachordStep"><Border Margin="2" Padding="6" Background="#553B82F6"><TextBlock Text="{Binding StepIndex, StringFormat='Step {0}'}" /></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+      <TextBlock Text="Bass Grid" FontSize="18" FontWeight="SemiBold" /><ItemsControl ItemsSource="{Binding BassSteps}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="mandachord:MandachordStep"><Border Margin="2" Padding="6" Background="#554CAF50"><TextBlock Text="{Binding StepIndex, StringFormat='Step {0}'}" /></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+      <TextBlock Text="Melody Grid" FontSize="18" FontWeight="SemiBold" /><ItemsControl ItemsSource="{Binding MelodySteps}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="mandachord:MandachordStep"><Border Margin="2" Padding="6" Background="#55E91E63"><TextBlock Text="{Binding StepIndex, StringFormat='Step {0}'}" /></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+      <TextBlock Text="The editor model supports multi-selection, copy/paste, pitch and percussion edits, clear, and Undo/Redo. This milestone view intentionally remains a compact grid inspector." TextWrapping="Wrap" Opacity="0.65" />
+    </StackPanel>
+  </Grid></ScrollViewer>
+</UserControl>

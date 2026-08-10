@@ -11,6 +11,7 @@
     <ProjectReference Include="..\VoidNote.GameBridge\VoidNote.GameBridge.csproj" />
     <ProjectReference Include="..\VoidNote.Midi\VoidNote.Midi.csproj" />
     <ProjectReference Include="..\VoidNote.Shawzin\VoidNote.Shawzin.csproj" />
+    <ProjectReference Include="..\VoidNote.Mandachord\VoidNote.Mandachord.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" />

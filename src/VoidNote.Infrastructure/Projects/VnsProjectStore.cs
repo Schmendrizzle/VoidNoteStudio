@@ -151,6 +151,11 @@ public sealed class VnsProjectStore : IProjectStore
             root["AudioTranscriptionReports"] ??= new JsonArray();
         }
         if (loadedVersion <= 2) root["CreatorSessions"] ??= new JsonArray();
+        if (loadedVersion <= 3)
+        {
+            root["MandachordArrangements"] ??= new JsonArray();
+            root["MandachordSoundSets"] ??= new JsonArray();
+        }
         root["FormatVersion"] = VoidNoteProject.CurrentFormatVersion;
         root.Remove("formatVersion");
     }

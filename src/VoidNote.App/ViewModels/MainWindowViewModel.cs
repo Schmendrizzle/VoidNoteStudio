@@ -18,7 +18,7 @@ namespace VoidNote.App.ViewModels;
 public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiShawzinWorkflow multiWorkflow,
     IShawzinEnsembleArranger ensembleArranger, GameBridgePlaybackSession gameBridge,
     KeybindProfileService profileService, ISettingsStore settingsStore, ILogger<MainWindowViewModel> logger,
-    AudioLabViewModel audioLab, CreatorModeViewModel creatorMode) : INotifyPropertyChanged
+    AudioLabViewModel audioLab, CreatorModeViewModel creatorMode, MandachordStudioViewModel mandachordStudio) : INotifyPropertyChanged
 {
     private readonly IShawzinStudioWorkflow _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
     private ProjectTimeline? _timeline;
@@ -53,6 +53,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     public event PropertyChangedEventHandler? PropertyChanged;
     public AudioLabViewModel AudioLab { get; } = audioLab;
     public CreatorModeViewModel CreatorMode { get; } = creatorMode;
+    public MandachordStudioViewModel MandachordStudio { get; } = mandachordStudio;
     public IReadOnlyList<MidiTrack> Tracks { get; private set; } = [];
     public IReadOnlyList<ShawzinDefinition> Instruments => BuiltInShawzinDefinitions.All;
     public IReadOnlyList<ShawzinScale> Scales { get; } = Enum.GetValues<ShawzinScale>();
@@ -117,6 +118,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         var import = await _workflow.ImportMidiFileAsync(path, cancellationToken);
         _timeline = import.Timeline;
         Tracks = import.Tracks;
+        MandachordStudio.Prepare(import.Timeline, import.Tracks);
         SelectedTrack = Tracks.FirstOrDefault();
         OnPropertyChanged(nameof(Tracks));
         Status = $"Loaded {Tracks.Count} MIDI track(s).";

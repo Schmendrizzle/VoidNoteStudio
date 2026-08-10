@@ -11,6 +11,7 @@
     <ProjectReference Include="..\..\src\VoidNote.GameBridge\VoidNote.GameBridge.csproj" />
     <ProjectReference Include="..\..\src\VoidNote.Midi\VoidNote.Midi.csproj" />
     <ProjectReference Include="..\..\src\VoidNote.Shawzin\VoidNote.Shawzin.csproj" />
+    <ProjectReference Include="..\..\src\VoidNote.Mandachord\VoidNote.Mandachord.csproj" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio"><PrivateAssets>all</PrivateAssets></PackageReference>

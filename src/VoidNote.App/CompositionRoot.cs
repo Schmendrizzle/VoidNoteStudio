@@ -30,6 +30,11 @@ using VoidNote.Audio.Playback;
 using VoidNote.Audio.Waveforms;
 using VoidNote.Audio.Intelligence;
 using VoidNote.Application.Creator;
+using VoidNote.Application.Mandachord;
+using VoidNote.Mandachord.Mapping;
+using VoidNote.Mandachord.Generation;
+using VoidNote.Mandachord.Preview;
+using VoidNote.Mandachord.Export;
 
 namespace VoidNote.App;
 
@@ -100,6 +105,15 @@ internal static class CompositionRoot
         services.AddSingleton<ICreatorSessionFactory, CreatorSessionFactory>();
         services.AddSingleton<ICreatorExportService, CreatorExportService>();
         services.AddTransient<CreatorModeViewModel>();
+        services.AddSingleton<IMandachordPitchMapper, MandachordPitchMapper>();
+        services.AddSingleton<IMandachordTimingMapper, MandachordTimingMapper>();
+        services.AddSingleton<IMandachordGenerator, MandachordGenerator>();
+        services.AddSingleton<IMandachordPreviewRenderer, SyntheticMandachordPreviewRenderer>();
+        services.AddSingleton<ICombinedPreviewRenderer, PcmCombinedPreviewRenderer>();
+        services.AddSingleton<IMandachordJsonCodec, VoidNoteMandachordJsonCodec>();
+        services.AddSingleton<IMandachordMidiExporter, MandachordMidiExporter>();
+        services.AddSingleton<IMandachordEditorService, MandachordEditorService>();
+        services.AddTransient<MandachordStudioViewModel>();
         services.AddSingleton<IKeybindProfileValidator, KeybindProfileValidator>();
         services.AddSingleton<IKeybindProfileStore, JsonKeybindProfileStore>();
         services.AddSingleton<KeybindProfileService>();

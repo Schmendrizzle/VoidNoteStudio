@@ -3,5 +3,6 @@
     <ProjectReference Include="..\VoidNote.Domain\VoidNote.Domain.csproj" />
     <ProjectReference Include="..\VoidNote.Midi\VoidNote.Midi.csproj" />
     <ProjectReference Include="..\VoidNote.Shawzin\VoidNote.Shawzin.csproj" />
+    <ProjectReference Include="..\VoidNote.Mandachord\VoidNote.Mandachord.csproj" />
   </ItemGroup>
 </Project>

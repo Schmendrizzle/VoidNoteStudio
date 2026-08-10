@@ -2,6 +2,7 @@ using VoidNote.Domain.Creator;
 using VoidNote.Domain.Music;
 using VoidNote.Domain.Projects;
 using VoidNote.Shawzin.Ensemble;
+using VoidNote.Domain.Mandachord;
 
 namespace VoidNote.Application.Creator;
 
@@ -30,7 +31,9 @@ public sealed class CreatorSessionFactory(ICreatorTimingService timing) : ICreat
         var audio = project.AudioTracks.Select(track => new CreatorSourceCandidate(track.Id, track.Name, CreatorSourceType.Audio,
             new(track.Clips.Select(value => project.Timeline.ToAbsoluteTime(value.Start).Seconds + value.Duration.Seconds).DefaultIfEmpty(0m).Max()), 0,
             project.StemSets.SelectMany(value => value.StemTracks).Any(stem => track.Clips.Any(clip => clip.SourceId == stem.AudioSourceId)) ? "Separated stem -> Audio track" : "Audio track"));
-        return midi.Concat(shawzin).Concat(audio).OrderBy(value => value.Name).ThenBy(value => value.TrackId).ToArray();
+        var mandachord = project.MandachordArrangements.Select(value => new CreatorSourceCandidate(value.Id, value.Name, CreatorSourceType.Mandachord,
+            new(8m * Math.Max(1, value.Sections.Count)), value.Patterns.Sum(pattern => pattern.Steps.Count), $"Mandachord {value.Preset}"));
+        return midi.Concat(shawzin).Concat(audio).Concat(mandachord).OrderBy(value => value.Name).ThenBy(value => value.TrackId).ToArray();
     }
 
     public CreatorSession FromProject(VoidNoteProject project, IReadOnlyCollection<CreatorTrackSelection>? selection = null,
@@ -40,10 +43,18 @@ public sealed class CreatorSessionFactory(ICreatorTimingService timing) : ICreat
         var sources = GetProjectSources(project).Where(value => included is null || included.Contains(value.TrackId)).ToArray();
         var session = new CreatorSession { Name = name, ProjectId = project.Id, MasterTimeline = project.Timeline, CreatedAt = instant,
             ModifiedAt = instant, SongDuration = new(sources.Select(value => value.Duration.Seconds).DefaultIfEmpty(0m).Max()) };
-        foreach (var source in sources) session.Takes.Add(new CreatorTake { Name = source.Name, SourceTrackId = source.TrackId,
+        foreach (var source in sources)
+        {
+            var arrangement = source.SourceType == CreatorSourceType.Mandachord ? project.MandachordArrangements.Single(value => value.Id == source.TrackId) : null;
+            session.Takes.Add(new CreatorTake { Name = source.Name, SourceTrackId = source.TrackId,
             SourceType = source.SourceType, SourceName = source.Name, SourceProvenance = source.Provenance, CreatedAt = instant,
             Status = CreatorTakeStatus.Ready, ExpectedEventCount = source.EventCount,
-            RequiresGameBridge = source.SourceType == CreatorSourceType.Shawzin });
+            RequiresGameBridge = source.SourceType == CreatorSourceType.Shawzin,
+            MandachordArrangementId = arrangement?.Id, MandachordPreset = arrangement?.Preset.ToString() ?? string.Empty,
+            MandachordSoundSetId = arrangement?.SelectedSoundSetId, MandachordSection = arrangement?.Sections.FirstOrDefault()?.Name ?? string.Empty,
+            Checklist = arrangement is null ? [] : [new() { Label = "Correct Mandachord pattern selected" }, new() { Label = "Correct section selected" }, new() { Label = "Manual in-game performance ready" }],
+            });
+        }
         foreach (var take in session.Takes) timing.Plan(session, take); project.CreatorSessions.Add(session); return session;
     }
     public CreatorSession FromEnsemble(VoidNoteProject project, ShawzinEnsemble ensemble, EnsembleExportReport export,
@@ -113,6 +124,8 @@ public sealed class CreatorSessionFactory(ICreatorTimingService timing) : ICreat
             AttemptNumber = attempt, RetakeGroupId = original.RetakeGroupId, CreatedAt = now ?? DateTimeOffset.UtcNow,
             TimingOffset = original.TimingOffset, ExpectedEventCount = original.ExpectedEventCount,
             RequiresGameBridge = original.RequiresGameBridge, Status = CreatorTakeStatus.Pending,
+            MandachordArrangementId = original.MandachordArrangementId, MandachordPreset = original.MandachordPreset,
+            MandachordSoundSetId = original.MandachordSoundSetId, MandachordSection = original.MandachordSection,
             Checklist = original.Checklist.Select(value => new CreatorChecklistItem { Label = value.Label, IsRequired = value.IsRequired }).ToList(),
         };
         timing.Plan(session, retake); session.Takes.Add(retake); session.ModifiedAt = now ?? DateTimeOffset.UtcNow;

@@ -3,7 +3,7 @@ using VoidNote.Domain.Projects;
 
 namespace VoidNote.Domain.Creator;
 
-public enum CreatorSourceType { Shawzin, EnsembleShawzin, Audio, Midi, FutureMandachord }
+public enum CreatorSourceType { Shawzin, EnsembleShawzin, Audio, Midi, FutureMandachord, Mandachord }
 public enum CreatorTakeStatus { Pending, Ready, Recording, Completed, NeedsRetake, Rejected }
 public enum CreatorCountInMode { FourBeats, OneBar, TwoBars, CustomBeats }
 public enum CreatorTakeRangeType { FullSong, Section, CustomRange }
@@ -91,6 +91,10 @@ public sealed class CreatorTake : ProjectItem
     public bool RequiresGameBridge { get; set; }
     public List<CreatorStatusChange> StatusHistory { get; init; } = [];
     public List<CreatorChecklistItem> Checklist { get; init; } = [];
+    public Guid? MandachordArrangementId { get; set; }
+    public string MandachordPreset { get; set; } = string.Empty;
+    public Guid? MandachordSoundSetId { get; set; }
+    public string MandachordSection { get; set; } = string.Empty;
 
     public void ChangeStatus(CreatorTakeStatus status, DateTimeOffset changedAt, string reason = "")
     {
