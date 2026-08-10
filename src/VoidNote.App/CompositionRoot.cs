@@ -29,6 +29,7 @@ using VoidNote.Audio.Import;
 using VoidNote.Audio.Playback;
 using VoidNote.Audio.Waveforms;
 using VoidNote.Audio.Intelligence;
+using VoidNote.Application.Creator;
 
 namespace VoidNote.App;
 
@@ -95,6 +96,10 @@ internal static class CompositionRoot
         services.AddSingleton<IShawzinEnsemblePreviewRenderer, SyntheticShawzinEnsemblePreviewRenderer>();
         services.AddSingleton<IMultiShawzinWorkflow, MultiShawzinWorkflow>();
         services.AddSingleton<IEnsembleReassignmentService, EnsembleReassignmentService>();
+        services.AddSingleton<ICreatorTimingService, CreatorTimingService>();
+        services.AddSingleton<ICreatorSessionFactory, CreatorSessionFactory>();
+        services.AddSingleton<ICreatorExportService, CreatorExportService>();
+        services.AddTransient<CreatorModeViewModel>();
         services.AddSingleton<IKeybindProfileValidator, KeybindProfileValidator>();
         services.AddSingleton<IKeybindProfileStore, JsonKeybindProfileStore>();
         services.AddSingleton<KeybindProfileService>();

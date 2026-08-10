@@ -1,6 +1,7 @@
 using VoidNote.Domain.Music;
 using VoidNote.Domain.Shawzin;
 using VoidNote.Domain.Audio;
+using VoidNote.Domain.Creator;
 
 namespace VoidNote.Domain.Projects;
 
@@ -8,7 +9,7 @@ namespace VoidNote.Domain.Projects;
 public sealed class VoidNoteProject
 {
     /// <summary>The project format version produced by this milestone.</summary>
-    public const int CurrentFormatVersion = 2;
+    public const int CurrentFormatVersion = 3;
 
     /// <summary>Gets or initializes the serialized format version.</summary>
     public int FormatVersion { get; init; } = CurrentFormatVersion;
@@ -86,6 +87,8 @@ public sealed class VoidNoteProject
             .Concat(ShawzinTracks)
             .Concat(MandachordTracks)
             .Concat(CreatorSessions)
+            .Concat(CreatorSessions.SelectMany(session => session.Sections))
+            .Concat(CreatorSessions.SelectMany(session => session.Takes))
             .Select(item => item.Id)
             .ToArray();
 
@@ -117,5 +120,9 @@ public sealed class VoidNoteProject
         var midiIds = MidiTracks.Select(track => track.Id).ToHashSet();
         if (AudioTranscriptionReports.Any(report => !midiIds.Contains(report.MidiTrackId)))
             throw new InvalidOperationException("Every transcription report must reference a MIDI track in the project.");
+
+        if (CreatorSessions.Any(session => session.ProjectId != Id))
+            throw new InvalidOperationException("Every creator session must belong to this project.");
+        foreach (var session in CreatorSessions) session.Validate();
     }
 }

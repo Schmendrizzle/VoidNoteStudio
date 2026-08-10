@@ -5,6 +5,7 @@ using VoidNote.GameBridge.Mapping;
 using VoidNote.GameBridge.Profiles;
 using VoidNote.GameBridge.Safety;
 using VoidNote.Shawzin.Playback;
+using VoidNote.Domain.Music;
 
 namespace VoidNote.GameBridge.Playback;
 
@@ -36,6 +37,25 @@ public sealed class GameBridgePlaybackSession : IAsyncDisposable
         _output = new(_bridge, _mapper, profile, _focus, targetTitle, requireFocus, timing); _output.Begin();
         _engine = new(new SystemShawzinPlaybackScheduler(), _output);
         try { await _engine.LoadAsync(track, token).ConfigureAwait(false); await _engine.PlayAsync(token).ConfigureAwait(false); }
+        catch { await FailSafeAsync().ConfigureAwait(false); throw; }
+        finally { _arm.Disarm(); }
+    }
+
+    public async Task PlayRangeAsync(ShawzinTrack track, ShawzinKeybindProfile profile, GameBridgeTimingOptions timing,
+        string targetTitle, bool requireFocus, AbsoluteTime sourceStart, AbsoluteTime duration, CancellationToken token = default)
+    {
+        _arm.EnsureArmed(); Validate(profile); await StopEngineAsync().ConfigureAwait(false);
+        _output = new(_bridge, _mapper, profile, _focus, targetTitle, requireFocus, timing); _output.Begin();
+        _engine = new(new SystemShawzinPlaybackScheduler(), _output);
+        using var range = CancellationTokenSource.CreateLinkedTokenSource(token);
+        if (duration.Seconds > 0) range.CancelAfter(TimeSpan.FromSeconds((double)duration.Seconds));
+        try
+        {
+            await _engine.LoadAsync(track, range.Token).ConfigureAwait(false);
+            if (sourceStart.Seconds > 0) await _engine.SeekAsync(sourceStart, range.Token).ConfigureAwait(false);
+            await _engine.PlayAsync(range.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (range.IsCancellationRequested && !token.IsCancellationRequested) { }
         catch { await FailSafeAsync().ConfigureAwait(false); throw; }
         finally { _arm.Disarm(); }
     }

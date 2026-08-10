@@ -18,7 +18,7 @@ namespace VoidNote.App.ViewModels;
 public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiShawzinWorkflow multiWorkflow,
     IShawzinEnsembleArranger ensembleArranger, GameBridgePlaybackSession gameBridge,
     KeybindProfileService profileService, ISettingsStore settingsStore, ILogger<MainWindowViewModel> logger,
-    AudioLabViewModel audioLab) : INotifyPropertyChanged
+    AudioLabViewModel audioLab, CreatorModeViewModel creatorMode) : INotifyPropertyChanged
 {
     private readonly IShawzinStudioWorkflow _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
     private ProjectTimeline? _timeline;
@@ -52,6 +52,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public AudioLabViewModel AudioLab { get; } = audioLab;
+    public CreatorModeViewModel CreatorMode { get; } = creatorMode;
     public IReadOnlyList<MidiTrack> Tracks { get; private set; } = [];
     public IReadOnlyList<ShawzinDefinition> Instruments => BuiltInShawzinDefinitions.All;
     public IReadOnlyList<ShawzinScale> Scales { get; } = Enum.GetValues<ShawzinScale>();
@@ -157,6 +158,8 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
             Strategy = SplitStrategy,
         });
         _ensemble = result.Ensemble;
+        var creatorProject = new VoidNoteProject { Metadata = new ProjectMetadata { Title = "Creator Project" }, Timeline = _timeline };
+        CreatorMode.Prepare(creatorProject, result.Ensemble, result.Export);
         _previewWave = result.Preview.WaveData;
         var exports = result.Export.Tracks.ToDictionary(value => value.TrackId);
         EnsembleTracks = result.Ensemble.Tracks.Select(track => new EnsembleTrackViewModel(result.Ensemble, track, ensembleArranger, RefreshEnsemble)

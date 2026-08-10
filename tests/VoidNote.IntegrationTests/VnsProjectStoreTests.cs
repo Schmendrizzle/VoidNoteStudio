@@ -98,7 +98,7 @@ public sealed class VnsProjectStoreTests
     }
 
     [Fact]
-    public async Task VersionOneProject_MigratesInMemoryAndCreatesBackupBeforeFirstVersionTwoSave()
+    public async Task VersionOneProject_MigratesInMemoryAndCreatesBackupBeforeFirstCurrentVersionSave()
     {
         using var directory = new TemporaryDirectory(); var path = Path.Combine(directory.Path, "legacy.vns"); var store = new VnsProjectStore();
         await store.SaveAsync(new VoidNoteProject { Metadata = new() { Title = "Legacy" } }, path);
@@ -113,10 +113,10 @@ public sealed class VnsProjectStoreTests
         }
 
         var loaded = await store.LoadAsync(path);
-        Assert.Equal(2, loaded.FormatVersion); Assert.Equal(1, loaded.LoadedFormatVersion); Assert.Empty(loaded.StemSets);
+        Assert.Equal(VoidNoteProject.CurrentFormatVersion, loaded.FormatVersion); Assert.Equal(1, loaded.LoadedFormatVersion); Assert.Empty(loaded.StemSets);
         Assert.Equal("Legacy Stem", Assert.Single(loaded.LegacyStemReferences).Name);
         await store.SaveAsync(loaded, path);
-        Assert.True(File.Exists(path + ".v1.bak")); Assert.Equal(2, (await store.LoadAsync(path)).FormatVersion);
+        Assert.True(File.Exists(path + ".v1.bak")); Assert.Equal(VoidNoteProject.CurrentFormatVersion, (await store.LoadAsync(path)).FormatVersion);
     }
 
     [Fact]

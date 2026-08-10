@@ -149,8 +149,9 @@ public sealed class VnsProjectStore : IProjectStore
             root.Remove("stems");
             root["StemSets"] ??= new JsonArray();
             root["AudioTranscriptionReports"] ??= new JsonArray();
-            root["FormatVersion"] = VoidNoteProject.CurrentFormatVersion;
-            root.Remove("formatVersion");
         }
+        if (loadedVersion <= 2) root["CreatorSessions"] ??= new JsonArray();
+        root["FormatVersion"] = VoidNoteProject.CurrentFormatVersion;
+        root.Remove("formatVersion");
     }
 }

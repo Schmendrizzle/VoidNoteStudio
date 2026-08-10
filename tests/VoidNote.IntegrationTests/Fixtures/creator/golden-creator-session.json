@@ -1,0 +1,20 @@
+{
+  "fixture": "Milestone I Golden Creator",
+  "song": "Four Voice Creator Fixture",
+  "musicStartSeconds": 5.6,
+  "countInBeats": 4,
+  "syncPointSeconds": 5.2,
+  "sections": [
+    { "name": "Intro", "start": 0, "end": 3 },
+    { "name": "Verse", "start": 3, "end": 8 },
+    { "name": "Outro", "start": 8, "end": 12 }
+  ],
+  "takes": [
+    { "name": "Lead", "attempt": 1, "status": "Completed", "code": "5BAA-LEAD" },
+    { "name": "Harmony", "attempt": 1, "status": "Completed", "code": "5BAA-HARMONY" },
+    { "name": "Bass", "attempt": 1, "status": "Rejected", "code": "5BAA-BASS" },
+    { "name": "Bass", "attempt": 2, "status": "Completed", "code": "5BAA-BASS" },
+    { "name": "Counter Melody", "attempt": 1, "status": "Pending", "code": "5BAA-COUNTER" }
+  ],
+  "report": { "tracks": 4, "takes": 5, "completed": 3, "pending": 1, "needsRetake": 0 }
+}

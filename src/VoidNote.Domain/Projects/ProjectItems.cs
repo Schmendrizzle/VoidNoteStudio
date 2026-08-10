@@ -53,6 +53,3 @@ public sealed class MidiTrack : ProjectTrack;
 
 /// <summary>Represents the foundation of a Mandachord track; arrangement is not implemented.</summary>
 public sealed class MandachordTrack : ProjectTrack;
-
-/// <summary>Represents a future creator session boundary without creator workflow logic.</summary>
-public sealed class CreatorSession : ProjectItem;

@@ -86,3 +86,7 @@ Jede Stimme erhält über die bestehenden Services Scale Candidates, Transpositi
 ## Multi-Code Export
 
 `EnsembleCodeExporter` kodiert jeden erfolgreichen `ShawzinTrack` unabhängig. Der Bericht enthält Trackname, Instrument, Skala, Transposition, Eventzahl, Dauer, Compatibility, Code, Codelänge, Validierungsstatus und strukturierte Fehler. Eine fehlgeschlagene Spur verhindert nicht, dass erfolgreiche Spuren samt eigenem Status sichtbar bleiben.
+
+## Übergabe an Creator Mode
+
+`CreatorSessionFactory` übernimmt ausgewählte Ensemble-Spuren, Namen, Instrument, Skala, Transposition, Arrangementstrategie, Eventzahl und die bereits über den bestehenden Codec erzeugten individuellen Codes. Der Wizard darf Spuren ein- oder ausschließen. Audio-Transkriptionsherkunft aus den normalisierten Source Events wird als Provenienztext weitergereicht. Alle Takes referenzieren dieselbe Projekt-Timeline; `CreatorTimingService` erzeugt für jeden Take denselben absoluten Music Start. Retakes kopieren die Quellenzuordnung in einen neuen historisch erhaltenen Versuch.

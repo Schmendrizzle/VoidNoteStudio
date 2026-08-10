@@ -1,8 +1,8 @@
-# VoidNote Studio – Architekturstand Milestone H
+# VoidNote Studio – Architekturstand Milestone I
 
 ## Geltungsbereich
 
-Dieses Dokument beschreibt die implementierte Architektur nach **Milestone H – Audio Intelligence**. Stem Separation und Audio-to-MIDI sind als optionale, lokal ausgeführte Worker-Engines enthalten. Mandachord und der Take Manager bleiben späteren Milestones vorbehalten.
+Dieses Dokument beschreibt die implementierte Architektur nach **Milestone I – Creator Mode**. Creator Mode orchestriert Timeline, Shawzin-Ensembles, Codeexport, Preview und die vorhandene GameBridge. Mandachord bleibt dem nächsten Milestone vorbehalten.
 
 ## Technische Basis
 
@@ -55,7 +55,7 @@ VoidNote.Domain ─────────────────> keine exter
 
 ## Zentrales Projekt- und Zeitmodell
 
-`VoidNoteProject` bleibt die versionierte Wurzel des normalisierten Modells (`formatVersion = 2`). Version 1 wird beim Laden in-memory migriert; vor dem ersten Speichern über eine bestehende v1-Datei entsteht einmalig eine `.v1.bak`-Sicherung. `MidiTrack` enthält `MusicalEvent`-Noten mit stabiler ID, Starttick, Dauer, Pitch, Velocity, Herkunft, Confidence und optionaler dauerhafter Audio-Provenienz.
+`VoidNoteProject` bleibt die versionierte Wurzel des normalisierten Modells (`formatVersion = 3`). Versionen 1 und 2 werden beim Laden in-memory migriert; vor dem ersten Speichern über eine ältere Datei entsteht einmalig eine versionsbezogene Sicherung. `MidiTrack` enthält `MusicalEvent`-Noten mit stabiler ID, Starttick, Dauer, Pitch, Velocity, Herkunft, Confidence und optionaler dauerhafter Audio-Provenienz.
 
 `AudioSource` beschreibt immutable Quelldateien mit expliziter eingebetteter, relativer oder absoluter Referenz und formatunabhängigen Metadaten. `AudioTrack` enthält nicht-destruktive `AudioClip`-Platzierungen; deren `MusicalTime`-Start liegt auf derselben `ProjectTimeline` wie MIDI und Shawzin. Gain, Mute, Solo, Active, Trim-In und Dauer verändern die Originaldatei nicht. `AudioRegion` speichert Auswahl und Loop in präziser `AbsoluteTime`.
 
@@ -138,7 +138,9 @@ Die Bridge ist standardmäßig disarmed. Profilvalidierung, Fokusprüfung und Ca
 
 Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `project.json`; eingebettete Audioquellen liegen unverändert unter `audio/`, Stem-Assets unter `stems/`, externe Referenzen bleiben explizit relativ oder absolut. Settings und Projekte werden atomar geschrieben; Logging bleibt lokal und ohne Telemetrie; Undo/Redo bleibt UI-unabhängig. Ältere Version-1-Projekte bleiben ladbar. Unvollständige v1-Stem-Platzhalter werden als `LegacyStemReferences` verlustfrei bewahrt, statt erfundene Engine-Provenienz zu erhalten.
 
-## Bewusst offene Punkte nach Milestone H
+Creator Sessions sind Teil der Projektwurzel. Session, Takes, Sections, Statushistorie, Checklisten, Notizen, Range-Zuordnung und deterministische Sync-Metadaten werden in `project.json` persistiert. Die Domain bleibt frei von Avalonia, Audio-Engine-, GameBridge- und Videoabhängigkeiten. Application-Services planen, exportieren und koordinieren; die minimale Creator-Ansicht projiziert diese Services nur.
+
+## Bewusst offene Punkte nach Milestone I
 
 - MIDI-Kanäle, Program Changes, Controller, Marker und SysEx sind noch nicht Teil des normalisierten Domain-Modells.
 - SMPTE-Time-Division wird abgelehnt; der MIDI Core verwendet PPQ.
