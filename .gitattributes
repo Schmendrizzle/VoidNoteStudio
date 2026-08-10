@@ -1,0 +1,36 @@
+* text=auto
+
+# Cross-platform source and configuration files use LF in the repository.
+*.cs text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.sln text eol=lf
+*.axaml text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=lf
+
+# Windows launcher files remain CRLF when introduced.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Never attempt text conversion for media, archives, or fonts.
+*.wav binary
+*.mp3 binary
+*.flac binary
+*.mid binary
+*.midi binary
+*.zip binary
+*.gz binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary

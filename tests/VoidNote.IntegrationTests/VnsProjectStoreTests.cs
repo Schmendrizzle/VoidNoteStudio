@@ -149,5 +149,107 @@ public sealed class VnsProjectStoreTests
         Assert.Single(loaded.AudioTranscriptionReports);
     }
 
+    [Theory]
+    [InlineData("../escape.wav")]
+    [InlineData("/absolute.wav")]
+    [InlineData("C:/absolute.wav")]
+    public async Task LoadAsync_RejectsUnsafeEmbeddedArchivePaths(string unsafePath)
+    {
+        using var directory = new TemporaryDirectory();
+        var path = Path.Combine(directory.Path, "unsafe.vns");
+        var project = new VoidNoteProject
+        {
+            Metadata = new() { Title = "Unsafe" },
+            AudioSources =
+            [
+                new AudioSource
+                {
+                    Name = "unsafe", SourcePath = "unsafe.wav", File = new("audio/safe.wav", ProjectPathKind.Embedded),
+                    FileSize = 1, Format = Format(),
+                },
+            ],
+        };
+        using (var archive = ZipFile.Open(path, ZipArchiveMode.Create))
+        {
+            var manifest = archive.CreateEntry("project.json");
+            var document = JsonSerializer.SerializeToNode(project)!.AsObject();
+            document["AudioSources"]![0]!["File"]!["Path"] = unsafePath;
+            await using (var output = manifest.Open()) await JsonSerializer.SerializeAsync(output, document);
+            var asset = archive.CreateEntry(unsafePath);
+            await using var outputAsset = asset.Open(); await outputAsset.WriteAsync(new byte[] { 1 });
+        }
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => new VnsProjectStore().LoadAsync(path));
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsDuplicateManifestEntries()
+    {
+        using var directory = new TemporaryDirectory();
+        var path = Path.Combine(directory.Path, "duplicate.vns");
+        using (var archive = ZipFile.Open(path, ZipArchiveMode.Create))
+        {
+            foreach (var _ in Enumerable.Range(0, 2))
+            {
+                var entry = archive.CreateEntry("project.json");
+                await using var output = entry.Open();
+                await JsonSerializer.SerializeAsync(output, new VoidNoteProject());
+            }
+        }
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => new VnsProjectStore().LoadAsync(path));
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task OlderProjectVersions_MigrateToVersionFourWithoutDataLoss(int version)
+    {
+        using var directory = new TemporaryDirectory();
+        var path = Path.Combine(directory.Path, $"version-{version}.vns");
+        var store = new VnsProjectStore();
+        var noteId = Guid.NewGuid();
+        await store.SaveAsync(new VoidNoteProject
+        {
+            Metadata = new() { Title = $"Version {version}" },
+            MidiTracks = [new MidiTrack { Name = "Keep", Events = [new(noteId, new(10), new(20), 64, 100, MusicalEventSource.Manual, 1)] }],
+        }, path);
+        using (var archive = ZipFile.Open(path, ZipArchiveMode.Update))
+        {
+            var entry = archive.GetEntry("project.json")!; JsonNode manifest;
+            await using (var input = entry.Open()) manifest = await JsonNode.ParseAsync(input) ?? throw new InvalidDataException();
+            entry.Delete(); manifest["FormatVersion"] = version;
+            if (version == 2) manifest.AsObject().Remove("CreatorSessions");
+            manifest.AsObject().Remove("MandachordArrangements"); manifest.AsObject().Remove("MandachordSoundSets");
+            var replacement = archive.CreateEntry("project.json"); await using var output = replacement.Open(); await JsonSerializer.SerializeAsync(output, manifest);
+        }
+
+        var loaded = await store.LoadAsync(path);
+
+        Assert.Equal(version, loaded.LoadedFormatVersion);
+        Assert.Equal(noteId, Assert.Single(Assert.Single(loaded.MidiTracks).Events).Id);
+        await store.SaveAsync(loaded, path);
+        Assert.True(File.Exists(path + $".v{version}.bak"));
+    }
+
+    [Fact]
+    public async Task VersionFourStressProject_RoundTripsManyTracksAndEvents()
+    {
+        using var directory = new TemporaryDirectory();
+        var path = Path.Combine(directory.Path, "stress.vns");
+        var tracks = Enumerable.Range(0, 80).Select(track => new MidiTrack
+        {
+            Name = $"Track {track}",
+            Events = Enumerable.Range(0, 125).Select(note => new MusicalEvent(Guid.NewGuid(), new(note * 120L), new(100), 36 + note % 60, 80, MusicalEventSource.Generated, 1)).ToList(),
+        }).ToList();
+        var project = new VoidNoteProject { Metadata = new() { Title = "Stress" }, MidiTracks = tracks };
+
+        var store = new VnsProjectStore(); await store.SaveAsync(project, path); var loaded = await store.LoadAsync(path);
+
+        Assert.Equal(80, loaded.MidiTracks.Count);
+        Assert.Equal(10_000, loaded.MidiTracks.Sum(value => value.Events.Count));
+        Assert.All(loaded.MidiTracks, value => Assert.Equal(125, value.Events.Count));
+    }
+
     private static AudioFormatInfo Format() => new() { Container = "WAV", Codec = "pcm", SampleRate = 8000, ChannelCount = 1, Duration = new(1m) };
 }

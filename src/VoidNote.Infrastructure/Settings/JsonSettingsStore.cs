@@ -34,17 +34,53 @@ public sealed class JsonSettingsStore(IAppPathProvider pathProvider) : ISettings
             var settings = await JsonSerializer.DeserializeAsync<AppSettings>(stream, SerializerOptions, cancellationToken)
                 ?? throw new InvalidDataException("The settings file contains no settings object.");
 
-            if (settings.SchemaVersion != AppSettings.CurrentSchemaVersion)
+            if (settings.SchemaVersion is < 1 or > AppSettings.CurrentSchemaVersion)
             {
-                throw new InvalidDataException($"Unsupported settings schema version: {settings.SchemaVersion}.");
+                return new AppSettings();
             }
 
-            return settings;
+            return Normalize(settings);
         }
         catch (JsonException exception)
         {
-            throw new InvalidDataException("The settings file is not valid JSON.", exception);
+            System.Diagnostics.Debug.WriteLine($"VoidNote settings were invalid and defaults were loaded: {exception.Message}");
+            return new AppSettings();
         }
+    }
+
+    private static AppSettings Normalize(AppSettings settings)
+    {
+        var general = settings.General is null ? new GeneralSettings() : settings.General;
+        var appearance = settings.Appearance is null ? new AppearanceSettings() : settings.Appearance;
+        var autosave = settings.Autosave is null ? new AutosaveSettings() : settings.Autosave;
+        var storage = settings.Storage is null ? new StorageSettings() : settings.Storage;
+        var audio = settings.Audio is null ? new AudioSettings() : settings.Audio;
+        var intelligence = settings.AudioIntelligence is null ? new AudioIntelligenceSettings() : settings.AudioIntelligence;
+        var gameBridge = settings.GameBridge is null ? new GameBridgeSettings() : settings.GameBridge;
+        var culture = general.Culture is "de" or "en" ? general.Culture : "en";
+        var recent = (settings.RecentProjects ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value.Name) && !string.IsNullOrWhiteSpace(value.Path))
+            .GroupBy(value => value.Path, OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal)
+            .Select(group => group.OrderByDescending(value => value.LastOpenedUtc).First())
+            .OrderByDescending(value => value.LastOpenedUtc)
+            .Take(12)
+            .ToArray();
+        return settings with
+        {
+            SchemaVersion = AppSettings.CurrentSchemaVersion,
+            General = general with { Culture = culture },
+            Appearance = appearance,
+            Autosave = autosave with { CustomIntervalMinutes = Math.Clamp(autosave.CustomIntervalMinutes, 1, 1440) },
+            Storage = storage with { MigrationBackupRetention = Math.Clamp(storage.MigrationBackupRetention, 1, 10) },
+            Audio = audio,
+            GameBridge = gameBridge,
+            AudioIntelligence = intelligence with
+            {
+                MaximumParallelJobs = Math.Clamp(intelligence.MaximumParallelJobs, 1, 4),
+                WorkerTimeoutMinutes = Math.Clamp(intelligence.WorkerTimeoutMinutes, 1, 1440),
+            },
+            RecentProjects = recent,
+        };
     }
 
     /// <inheritdoc />

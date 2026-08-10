@@ -3,8 +3,11 @@
              x:Class="VoidNote.App.App"
              RequestedThemeVariant="Default">
   <Application.Resources>
-    <x:String x:Key="AppName">VoidNote Studio</x:String>
-    <x:String x:Key="MilestoneLabel">Milestone I</x:String>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://VoidNote.App/Resources/Strings.en.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />

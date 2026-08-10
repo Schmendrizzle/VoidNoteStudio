@@ -4,7 +4,7 @@ namespace VoidNote.Application.Settings;
 public sealed record AppSettings
 {
     /// <summary>The settings schema version supported by this build.</summary>
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     /// <summary>Gets the serialized settings schema version.</summary>
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
@@ -26,6 +26,12 @@ public sealed record AppSettings
 
     /// <summary>Gets local opt-in and timing preferences for the optional GameBridge.</summary>
     public GameBridgeSettings GameBridge { get; init; } = new();
+
+    /// <summary>Gets automatic recovery preferences.</summary>
+    public AutosaveSettings Autosave { get; init; } = new();
+
+    /// <summary>Gets the bounded, user-local recent-project history.</summary>
+    public IReadOnlyList<RecentProjectSettings> RecentProjects { get; init; } = [];
 }
 
 /// <summary>Contains settings that apply to the complete application.</summary>
@@ -33,6 +39,9 @@ public sealed record GeneralSettings
 {
     /// <summary>Gets the preferred UI culture name.</summary>
     public string Culture { get; init; } = "en";
+
+    /// <summary>Gets whether the welcome page has been completed at least once.</summary>
+    public bool FirstRunCompleted { get; init; }
 }
 
 /// <summary>Identifies the supported application theme selection.</summary>
@@ -58,6 +67,44 @@ public sealed record StorageSettings
 {
     /// <summary>Gets the optional default project directory.</summary>
     public string? DefaultProjectDirectory { get; init; }
+
+    /// <summary>Gets the maximum number of migration backups retained per project.</summary>
+    public int MigrationBackupRetention { get; init; } = 3;
+}
+
+/// <summary>Identifies built-in autosave choices while leaving a custom value available.</summary>
+public enum AutosaveInterval
+{
+    Disabled,
+    OneMinute,
+    FiveMinutes,
+    TenMinutes,
+    Custom,
+}
+
+/// <summary>Controls separate recovery snapshots; the normal project file is never targeted.</summary>
+public sealed record AutosaveSettings
+{
+    public AutosaveInterval Interval { get; init; } = AutosaveInterval.FiveMinutes;
+    public int CustomIntervalMinutes { get; init; } = 5;
+
+    public TimeSpan GetInterval() => Interval switch
+    {
+        AutosaveInterval.Disabled => Timeout.InfiniteTimeSpan,
+        AutosaveInterval.OneMinute => TimeSpan.FromMinutes(1),
+        AutosaveInterval.FiveMinutes => TimeSpan.FromMinutes(5),
+        AutosaveInterval.TenMinutes => TimeSpan.FromMinutes(10),
+        AutosaveInterval.Custom => TimeSpan.FromMinutes(Math.Clamp(CustomIntervalMinutes, 1, 1440)),
+        _ => TimeSpan.FromMinutes(5),
+    };
+}
+
+/// <summary>Stores only the minimum local metadata needed by the welcome page.</summary>
+public sealed record RecentProjectSettings
+{
+    public string Name { get; init; } = string.Empty;
+    public string Path { get; init; } = string.Empty;
+    public DateTimeOffset LastOpenedUtc { get; init; }
 }
 
 public sealed record AudioSettings

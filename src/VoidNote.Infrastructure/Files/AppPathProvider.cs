@@ -37,4 +37,10 @@ public sealed class AppPathProvider : IAppPathProvider
 
     /// <inheritdoc />
     public string AudioIntelligenceAssetDirectory => Path.Combine(_rootDirectory, "derived", "audio-intelligence");
+
+    /// <inheritdoc />
+    public string RecoveryDirectory => Path.Combine(_rootDirectory, "recovery");
+
+    /// <inheritdoc />
+    public string ShawzinValidationRecordsFilePath => Path.Combine(_rootDirectory, "shawzin-validation-records.json");
 }

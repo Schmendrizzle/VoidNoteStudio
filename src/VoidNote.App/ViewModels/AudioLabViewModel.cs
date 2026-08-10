@@ -38,7 +38,8 @@ public sealed class AudioLabViewModel : INotifyPropertyChanged, IAsyncDisposable
         _stemMix = stemMix; _intelligence = intelligence; _separationEngine = separationEngine; _transcriptionEngine = transcriptionEngine; _logger = logger; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
-    public VoidNoteProject Project { get; } = new();
+    public event EventHandler? ProjectChanged;
+    public VoidNoteProject Project { get; private set; } = new();
     public IReadOnlyList<AudioTrackRowViewModel> Tracks { get => _tracks; private set => Set(ref _tracks, value); }
     public AudioTrackRowViewModel? SelectedTrack { get => _selected; set { if (Set(ref _selected, value)) _ = LoadWaveformAsync(); } }
     public IReadOnlyList<StemRowViewModel> Stems { get => _stems; private set => Set(ref _stems, value); }
@@ -82,6 +83,7 @@ public sealed class AudioLabViewModel : INotifyPropertyChanged, IAsyncDisposable
             }, _operation.Token);
             Tracks = Project.AudioTracks.Select(track => new AudioTrackRowViewModel(Project, track, _history, RefreshTracks)).ToArray();
             SelectedTrack = Tracks.Single(row => row.Model.Id == result.Track.Id); Status = $"Imported {result.Source.Format.Codec} audio.";
+            ProjectChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException) { Status = "Audio import cancelled."; }
         catch (Exception exception) { _logger.LogError(exception, "Audio import failed"); Status = exception.Message; }
@@ -107,6 +109,7 @@ public sealed class AudioLabViewModel : INotifyPropertyChanged, IAsyncDisposable
             RefreshTracks(); Stems = Project.StemSets.SelectMany(value => value.StemTracks).Select(value => new StemRowViewModel(value)).ToArray();
             SelectedStem = Stems.FirstOrDefault(value => value.Model.Type == StemType.Bass) ?? Stems.FirstOrDefault();
             Status = $"Created {set.StemTracks.Count} non-destructive stems.";
+            ProjectChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException) { Status = "Stem separation cancelled."; }
         catch (Exception exception) { _logger.LogError(exception, "Stem separation failed"); Status = exception.Message; }
@@ -134,6 +137,7 @@ public sealed class AudioLabViewModel : INotifyPropertyChanged, IAsyncDisposable
             var report = result.Report;
             TranscriptionMetrics = $"{report.KeptNotes}/{report.DetectedNotes} notes Â· avg confidence {report.AverageConfidence:P0} Â· high {report.HighConfidenceCount} / medium {report.MediumConfidenceCount} / low {report.LowConfidenceCount} Â· density {report.NoteDensityPerSecond:F2}/s";
             Status = $"Created editable MIDI track '{result.Track.Name}'.";
+            ProjectChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException) { Status = "Audio transcription cancelled."; }
         catch (Exception exception) { _logger.LogError(exception, "Audio transcription failed"); Status = exception.Message; }
@@ -158,6 +162,7 @@ public sealed class AudioLabViewModel : INotifyPropertyChanged, IAsyncDisposable
         _history.Execute(new RemoveStemSetCommand(Project, set));
         RefreshTracks(); Stems = Project.StemSets.SelectMany(value => value.StemTracks).Select(value => new StemRowViewModel(value)).ToArray();
         SelectedStem = Stems.FirstOrDefault(); Status = "Stem set removed from the project; Undo can restore it.";
+        ProjectChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public async Task PlayStemMixAsync(CancellationToken token = default)
@@ -209,17 +214,28 @@ public sealed class AudioLabViewModel : INotifyPropertyChanged, IAsyncDisposable
     public void ZoomOut() => Zoom /= 1.5;
     public void CancelOperation() { _operation?.Cancel(); _operation?.Dispose(); _operation = null; }
     public void RefreshPlaybackPosition() { if (_playback.State != AudioPlaybackState.Stopped || _playback.Position.Seconds > 0) PlayheadSeconds = (double)_playback.Position.Seconds; }
+    public void LoadProject(VoidNoteProject project)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        CancelOperation(); Project = project; Waveform = null;
+        Tracks = project.AudioTracks.Select(track => new AudioTrackRowViewModel(project, track, _history, RefreshTracks)).ToArray();
+        SelectedTrack = Tracks.FirstOrDefault();
+        Stems = project.StemSets.SelectMany(value => value.StemTracks).Select(value => new StemRowViewModel(value)).ToArray();
+        SelectedStem = Stems.FirstOrDefault();
+        Status = Tracks.Count == 0 ? "No audio tracks in this project." : $"Loaded {Tracks.Count} audio track(s).";
+    }
     private void UpdateRegion() { var start = Math.Min(SelectionStartSeconds, SelectionEndSeconds); var end = Math.Max(SelectionStartSeconds, SelectionEndSeconds); Region.Start = new((decimal)start); Region.End = new((decimal)end); }
     private Guid? PrepareRegion()
     {
         UpdateRegion(); if (Region.Duration.Seconds <= 0) return null;
         if (!Project.AudioRegions.Contains(Region)) Project.AudioRegions.Add(Region); return Region.Id;
     }
-    private void RefreshTracks() { Tracks = Project.AudioTracks.Select(track => new AudioTrackRowViewModel(Project, track, _history, RefreshTracks)).ToArray(); SelectedTrack = Tracks.FirstOrDefault(); }
+    private void RefreshTracks() { Tracks = Project.AudioTracks.Select(track => new AudioTrackRowViewModel(Project, track, _history, RefreshTracks)).ToArray(); SelectedTrack = Tracks.FirstOrDefault(); ProjectChanged?.Invoke(this, EventArgs.Empty); }
     private async Task ObservePlaybackAsync(Task run) { try { await run; Status = "Audio playback complete."; } catch (Exception exception) { _logger.LogError(exception, "Audio playback failed"); Status = exception.Message; } }
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null) { if (EqualityComparer<T>.Default.Equals(field, value)) return false; field = value; OnPropertyChanged(name); return true; }
     private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
     private sealed class InlineProgress<T>(Action<T> callback) : IProgress<T> { public void Report(T value) => callback(value); }
+    public async Task ShutdownAsync() { CancelOperation(); await _stemMix.StopAsync(); await _playback.StopAsync(); }
     public async ValueTask DisposeAsync() { CancelOperation(); await _stemMix.DisposeAsync(); await _playback.DisposeAsync(); }
 }
 

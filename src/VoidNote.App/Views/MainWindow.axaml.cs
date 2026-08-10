@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Platform.Storage;
 using VoidNote.App.ViewModels;
+using Avalonia.Input;
 
 namespace VoidNote.App.Views;
 
@@ -13,9 +14,62 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         Opened += async (_, _) => await ViewModel.InitializeAsync();
+        KeyDown += MainWindow_KeyDown;
     }
 
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext!;
+
+    private void NewProject_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel.NewProject();
+
+    private async void OpenProject_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Open VoidNote project", AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("VoidNote project") { Patterns = ["*.vns"] }],
+        });
+        if (files.Count == 1) try { await ViewModel.OpenProjectAsync(files[0].Path.LocalPath); } catch (Exception exception) { await ShowErrorAsync("The project could not be opened.", exception); }
+    }
+
+    private async void SaveProject_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await SaveProjectAsync();
+
+    private async Task SaveProjectAsync()
+    {
+        try
+        {
+            if (Path.GetExtension(ViewModel.ProjectPath).Equals(".vns", StringComparison.OrdinalIgnoreCase)) { await ViewModel.SaveProjectAsync(); return; }
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Save VoidNote project", SuggestedFileName = ViewModel.ProjectName + ".vns", DefaultExtension = "vns",
+                FileTypeChoices = [new FilePickerFileType("VoidNote project") { Patterns = ["*.vns"] }],
+            });
+            if (file is not null) await ViewModel.SaveProjectAsync(file.Path.LocalPath);
+        }
+        catch (Exception exception) { await ShowErrorAsync("The project could not be saved. The existing file was not replaced.", exception); }
+    }
+
+    private async void OpenRecent_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { try { await ViewModel.OpenSelectedRecentProjectAsync(); } catch (Exception exception) { await ShowErrorAsync("The recent project could not be opened.", exception); } }
+    private async void Recover_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    { try { await ViewModel.RecoverAsync(); } catch (Exception exception) { await ShowErrorAsync("The recovery snapshot could not be opened.", exception); } }
+    private async void DiscardRecovery_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.DiscardRecoveryAsync();
+    private async void SaveSettings_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.SaveSettingsAsync();
+    private async void Diagnostics_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.RunDiagnosticsAsync();
+    private async void ExportDiagnostics_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions { Title = "Export VoidNote Diagnostics", SuggestedFileName = "voidnote-diagnostics.json", DefaultExtension = "json", FileTypeChoices = [new FilePickerFileType("JSON") { Patterns = ["*.json"] }] });
+        if (file is not null) await File.WriteAllTextAsync(file.Path.LocalPath, await ViewModel.ExportDiagnosticsJsonAsync());
+    }
+    private void ValidateCode_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel.ValidateShawzinCode();
+    private void GenerateMapping_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel.GenerateMappingSequence();
+    private async void ConfirmMapping_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.SaveMappingValidationAsync(true);
+    private async void SaveUnconfirmedMapping_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.SaveMappingValidationAsync(false);
+
+    private async void MainWindow_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.S) { e.Handled = true; await SaveProjectAsync(); }
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.O) { e.Handled = true; OpenProject_Click(sender, new Avalonia.Interactivity.RoutedEventArgs()); }
+    }
 
     private async void OpenMidi_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -60,7 +114,7 @@ public sealed partial class MainWindow : Window
             dialog.Content = new StackPanel { Margin = new Avalonia.Thickness(24), Spacing = 18, Children = { new TextBlock { Text = "Using external software with Warframe is at your own risk. VoidNote is independent and is not affiliated with or endorsed by Digital Extremes. This is not a statement that use is safe, approved, or free of account risk.", TextWrapping = Avalonia.Media.TextWrapping.Wrap }, accept } };
             if (await dialog.ShowDialog<bool>(this) is false) return;
         }
-        try { await ViewModel.ArmAsync(true); } catch (Exception exception) { await ShowErrorAsync(exception.Message); }
+        try { await ViewModel.ArmAsync(true); } catch (Exception exception) { await ShowErrorAsync("GameBridge could not be armed.", exception); }
     }
 
     private async void Disarm_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.DisarmAsync();
@@ -72,12 +126,15 @@ public sealed partial class MainWindow : Window
     private async void StartIngame_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.StartIngameAsync();
     private async void EmergencyStop_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.EmergencyStopAsync();
 
-    private async Task ShowErrorAsync(string message)
+    private async Task ShowErrorAsync(string message, Exception exception)
     {
-        var dialog = new Window { Title = "GameBridge", Width = 480, Height = 180, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var details = exception.ToString();
+        var dialog = new Window { Title = "VoidNote Studio", Width = 600, Height = 320, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         var close = new Button { Content = "Close", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+        var copy = new Button { Content = "Copy Details", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+        copy.Click += async (_, _) => { if (Clipboard is not null) await Clipboard.SetTextAsync(details); };
         close.Click += (_, _) => dialog.Close();
-        dialog.Content = new StackPanel { Margin = new Avalonia.Thickness(24), Spacing = 16, Children = { new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, close } };
+        dialog.Content = new StackPanel { Margin = new Avalonia.Thickness(24), Spacing = 16, Children = { new TextBlock { Text = message, FontWeight = Avalonia.Media.FontWeight.SemiBold, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, new TextBlock { Text = exception.Message, TextWrapping = Avalonia.Media.TextWrapping.Wrap }, new Expander { Header = "Technical details", Content = new TextBox { Text = details, IsReadOnly = true, AcceptsReturn = true, MaxHeight = 130 } }, new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, Children = { copy, close } } } };
         await dialog.ShowDialog(this);
     }
 }

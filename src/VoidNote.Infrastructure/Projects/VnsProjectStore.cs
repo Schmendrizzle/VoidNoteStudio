@@ -10,6 +10,11 @@ namespace VoidNote.Infrastructure.Projects;
 public sealed class VnsProjectStore : IProjectStore
 {
     private const string ManifestEntryName = "project.json";
+    private const int MaximumEntryCount = 4096;
+    private const long MaximumManifestBytes = 32L * 1024 * 1024;
+    private const long MaximumEmbeddedAssetBytes = 4L * 1024 * 1024 * 1024;
+    private const long MaximumTotalExpandedBytes = 8L * 1024 * 1024 * 1024;
+    private const int MaximumCompressionRatio = 250;
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.General)
     {
         WriteIndented = true,
@@ -27,8 +32,10 @@ public sealed class VnsProjectStore : IProjectStore
             bufferSize: 81920,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
-        var entry = archive.GetEntry(ManifestEntryName)
+        ValidateArchive(archive);
+        var entry = archive.Entries.SingleOrDefault(value => string.Equals(value.FullName, ManifestEntryName, StringComparison.Ordinal))
             ?? throw new InvalidDataException("The project container has no project.json manifest.");
+        if (entry.Length > MaximumManifestBytes) throw new InvalidDataException("The project manifest exceeds the safe size limit.");
 
         try
         {
@@ -86,8 +93,10 @@ public sealed class VnsProjectStore : IProjectStore
                 foreach (var source in project.AudioSources.Where(value => value.File?.Kind == ProjectPathKind.Embedded))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    ValidateArchiveEntryPath(source.File!.Path);
                     var sourcePath = source.ResolvedPath ?? source.SourcePath;
                     if (!File.Exists(sourcePath)) throw new FileNotFoundException($"Embedded audio source '{source.Name}' is unavailable and the project was not overwritten.", sourcePath);
+                    if (new FileInfo(sourcePath).Length > MaximumEmbeddedAssetBytes) throw new InvalidDataException($"Embedded audio source '{source.Name}' exceeds the safe size limit.");
                     var audioEntry = archive.CreateEntry(source.File!.Path, CompressionLevel.NoCompression);
                     await using var input = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
                     await using var output = audioEntry.Open(); await input.CopyToAsync(output, cancellationToken);
@@ -119,10 +128,16 @@ public sealed class VnsProjectStore : IProjectStore
 
     private static async Task ExtractEmbeddedAudioAsync(VoidNoteProject project, ZipArchive archive, CancellationToken token)
     {
+        long extractedBytes = 0;
         foreach (var source in project.AudioSources.Where(value => value.File?.Kind == ProjectPathKind.Embedded))
         {
-            var entry = archive.GetEntry(source.File!.Path) ?? throw new InvalidDataException($"Embedded audio entry '{source.File.Path}' is missing.");
+            ValidateArchiveEntryPath(source.File!.Path);
+            var entry = archive.Entries.SingleOrDefault(value => string.Equals(value.FullName, source.File.Path, StringComparison.Ordinal))
+                ?? throw new InvalidDataException($"Embedded audio entry '{source.File.Path}' is missing.");
+            ValidateAssetEntry(entry);
             if (source.FileSize > 0 && entry.Length != source.FileSize) throw new InvalidDataException($"Embedded audio entry '{source.File.Path}' has an unexpected size.");
+            extractedBytes = checked(extractedBytes + entry.Length);
+            if (extractedBytes > MaximumTotalExpandedBytes) throw new InvalidDataException("The project exceeds the total expanded-size limit.");
             var directory = Path.Combine(Path.GetTempPath(), "VoidNoteStudio", "embedded", project.Id.ToString("N")); Directory.CreateDirectory(directory);
             var extension = Path.GetExtension(source.File.Path); var target = Path.Combine(directory, source.Id.ToString("N") + extension); var temporary = target + ".tmp";
             try
@@ -130,12 +145,63 @@ public sealed class VnsProjectStore : IProjectStore
                 await using (var input = entry.Open())
                 await using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
                 {
-                    await input.CopyToAsync(output, token); await output.FlushAsync(token);
+                    await CopyWithLimitAsync(input, output, entry.Length, token); await output.FlushAsync(token);
                 }
                 File.Move(temporary, target, true); source.ResolvedPath = target;
             }
             finally { File.Delete(temporary); }
         }
+    }
+
+    private static void ValidateArchive(ZipArchive archive)
+    {
+        if (archive.Entries.Count > MaximumEntryCount) throw new InvalidDataException("The project container has too many entries.");
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        long expandedBytes = 0;
+        foreach (var entry in archive.Entries)
+        {
+            ValidateArchiveEntryPath(entry.FullName);
+            if (!names.Add(entry.FullName)) throw new InvalidDataException($"The project container contains duplicate entry '{entry.FullName}'.");
+            expandedBytes = checked(expandedBytes + entry.Length);
+            if (expandedBytes > MaximumTotalExpandedBytes) throw new InvalidDataException("The project exceeds the total expanded-size limit.");
+            if (IsSymbolicLink(entry)) throw new InvalidDataException($"Symbolic-link archive entry '{entry.FullName}' is not allowed.");
+        }
+    }
+
+    private static void ValidateAssetEntry(ZipArchiveEntry entry)
+    {
+        if (entry.Length > MaximumEmbeddedAssetBytes) throw new InvalidDataException($"Archive entry '{entry.FullName}' exceeds the safe size limit.");
+        if (entry.CompressedLength > 0 && entry.Length / entry.CompressedLength > MaximumCompressionRatio)
+            throw new InvalidDataException($"Archive entry '{entry.FullName}' has a suspicious compression ratio.");
+    }
+
+    private static void ValidateArchiveEntryPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Length > 1024 || Path.IsPathRooted(path) || path.StartsWith('/') || path.StartsWith('\\'))
+            throw new InvalidDataException("Project archive paths must be non-empty relative paths.");
+        var segments = path.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0 || segments.Any(segment => segment is "." or ".." || segment.Contains(':')))
+            throw new InvalidDataException($"Unsafe project archive path '{path}'.");
+    }
+
+    private static bool IsSymbolicLink(ZipArchiveEntry entry)
+    {
+        var unixMode = (entry.ExternalAttributes >> 16) & 0xF000;
+        return unixMode == 0xA000;
+    }
+
+    private static async Task CopyWithLimitAsync(Stream input, Stream output, long expectedLength, CancellationToken token)
+    {
+        var buffer = new byte[81920]; long copied = 0;
+        while (true)
+        {
+            var read = await input.ReadAsync(buffer, token).ConfigureAwait(false);
+            if (read == 0) break;
+            copied = checked(copied + read);
+            if (copied > expectedLength || copied > MaximumEmbeddedAssetBytes) throw new InvalidDataException("An embedded project asset exceeded its declared safe size.");
+            await output.WriteAsync(buffer.AsMemory(0, read), token).ConfigureAwait(false);
+        }
+        if (copied != expectedLength) throw new InvalidDataException("An embedded project asset ended before its declared size.");
     }
 
     private static void MigrateManifest(JsonNode document, int loadedVersion)

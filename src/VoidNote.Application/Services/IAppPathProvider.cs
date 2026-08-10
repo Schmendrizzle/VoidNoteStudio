@@ -20,4 +20,10 @@ public interface IAppPathProvider
 
     /// <summary>Gets storage for derived assets before they are embedded in a project.</summary>
     string AudioIntelligenceAssetDirectory { get; }
+
+    /// <summary>Gets the private root for autosave snapshots and recovery metadata.</summary>
+    string RecoveryDirectory { get; }
+
+    /// <summary>Gets local Shawzin mapping validation records.</summary>
+    string ShawzinValidationRecordsFilePath { get; }
 }

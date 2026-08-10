@@ -34,4 +34,36 @@ public sealed class JsonSettingsStoreTests
 
         Assert.Equal(expected, actual);
     }
+
+    [Fact]
+    public async Task LoadAsync_MigratesVersionOneAndNormalizesInvalidValues()
+    {
+        using var directory = new TemporaryDirectory();
+        var paths = new AppPathProvider(directory.Path);
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.SettingsFilePath)!);
+        await File.WriteAllTextAsync(paths.SettingsFilePath, """
+            { "SchemaVersion": 1, "General": { "Culture": "invalid" },
+              "AudioIntelligence": { "MaximumParallelJobs": 99, "WorkerTimeoutMinutes": 0 } }
+            """);
+
+        var settings = await new JsonSettingsStore(paths).LoadAsync();
+
+        Assert.Equal(AppSettings.CurrentSchemaVersion, settings.SchemaVersion);
+        Assert.Equal("en", settings.General.Culture);
+        Assert.Equal(4, settings.AudioIntelligence.MaximumParallelJobs);
+        Assert.Equal(1, settings.AudioIntelligence.WorkerTimeoutMinutes);
+    }
+
+    [Fact]
+    public async Task LoadAsync_InvalidJsonFallsBackToSafeDefaults()
+    {
+        using var directory = new TemporaryDirectory();
+        var paths = new AppPathProvider(directory.Path);
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.SettingsFilePath)!);
+        await File.WriteAllTextAsync(paths.SettingsFilePath, "{ not valid json");
+
+        var settings = await new JsonSettingsStore(paths).LoadAsync();
+
+        Assert.Equal(new AppSettings(), settings);
+    }
 }

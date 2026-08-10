@@ -35,6 +35,8 @@ using VoidNote.Mandachord.Mapping;
 using VoidNote.Mandachord.Generation;
 using VoidNote.Mandachord.Preview;
 using VoidNote.Mandachord.Export;
+using VoidNote.Application.Diagnostics;
+using VoidNote.Infrastructure.Diagnostics;
 
 namespace VoidNote.App;
 
@@ -49,8 +51,10 @@ internal static class CompositionRoot
         var services = new ServiceCollection();
 
         services.AddSingleton<IAppPathProvider>(paths);
+        services.AddSingleton(startupSettings);
         services.AddSingleton<ISettingsStore, JsonSettingsStore>();
         services.AddSingleton<IProjectStore, VnsProjectStore>();
+        services.AddSingleton<IProjectRecoveryService, ProjectRecoveryService>();
         services.AddSingleton<IUndoRedoService, UndoRedoService>();
         services.AddSingleton<IBackgroundJobManager, BackgroundJobManager>();
         services.AddSingleton<WaveAudioDecoder>();
@@ -92,6 +96,10 @@ internal static class CompositionRoot
         services.AddSingleton<IShawzinTranspositionAnalyzer, ShawzinTranspositionAnalyzer>();
         services.AddSingleton<IShawzinArranger, ShawzinArranger>();
         services.AddSingleton<IShawzinCodeEncoder, WarframeShawzinCodeEncoder>();
+        services.AddSingleton<IShawzinCodeDecoder, WarframeShawzinCodeDecoder>();
+        services.AddSingleton<IShawzinCodeValidator, WarframeShawzinCodeValidator>();
+        services.AddSingleton<IShawzinValidationTool, ShawzinValidationTool>();
+        services.AddSingleton<IShawzinValidationRecordStore, JsonShawzinValidationRecordStore>();
         services.AddSingleton<IShawzinPreviewRenderer, SyntheticShawzinPreviewRenderer>();
         services.AddSingleton<IShawzinStudioWorkflow, ShawzinStudioWorkflow>();
         services.AddSingleton<VoiceSalienceAnalyzer>();
@@ -122,6 +130,17 @@ internal static class CompositionRoot
         services.AddSingleton<IGameInputBridge>(_ => PlatformGameInputBridgeFactory.CreateBridge());
         services.AddSingleton<IGameTargetFocusService>(_ => PlatformGameInputBridgeFactory.CreateFocusService());
         services.AddSingleton<GameBridgePlaybackSession>();
+        services.AddSingleton<IVoidNoteDiagnosticsService>(_ => new VoidNoteDiagnosticsService(
+            paths,
+            startupSettings.Audio.FfmpegExecutablePath ?? "ffmpeg",
+            startupSettings.Audio.FfplayExecutablePath ?? "ffplay",
+            startupSettings.AudioIntelligence.PythonExecutablePath ?? "python",
+            workerScript,
+            () =>
+            {
+                var capability = _.GetRequiredService<IGameInputBridge>().Capability;
+                return (capability.IsAvailable, capability.Backend, capability.Description);
+            }));
         services.AddTransient<MainWindowViewModel>();
         services.AddLogging(builder =>
         {

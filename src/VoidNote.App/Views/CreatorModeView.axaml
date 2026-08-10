@@ -3,12 +3,12 @@
   <ScrollViewer>
     <Grid Margin="28" ColumnDefinitions="360,*" ColumnSpacing="28">
       <StackPanel Spacing="12">
-        <TextBlock Text="CREATOR MODE" FontSize="26" FontWeight="Bold" />
-        <TextBlock Text="Session wizard" FontSize="18" FontWeight="SemiBold" />
+    <TextBlock Text="{DynamicResource CreatorTitle}" FontSize="26" FontWeight="Bold" />
+    <TextBlock Text="{DynamicResource SessionWizard}" FontSize="18" FontWeight="SemiBold" />
         <ItemsControl ItemsSource="{Binding TrackChoices}">
           <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:CreatorTrackChoiceViewModel"><CheckBox Content="{Binding Name}" IsChecked="{Binding IsIncluded}" /></DataTemplate></ItemsControl.ItemTemplate>
         </ItemsControl>
-        <Button Content="Create Creator Session" Click="CreateSession_Click" />
+    <Button Content="{DynamicResource CreateSession}" Click="CreateSession_Click" />
         <TextBlock Text="{Binding SessionName}" FontSize="20" FontWeight="SemiBold" />
         <TextBlock Text="{Binding Progress}" />
         <ListBox ItemsSource="{Binding Takes}" SelectedItem="{Binding SelectedTake}" MaxHeight="420">
@@ -24,16 +24,16 @@
         </ListBox>
       </StackPanel>
       <StackPanel Grid.Column="1" Spacing="12">
-        <TextBlock Text="Take preparation" FontSize="22" FontWeight="SemiBold" />
+      <TextBlock Text="{DynamicResource TakePreparation}" FontSize="22" FontWeight="SemiBold" />
         <Border Padding="16" Background="{DynamicResource SystemControlBackgroundAltHighBrush}"><TextBlock Text="{Binding Preparation}" TextWrapping="Wrap" /></Border>
-        <TextBlock Text="Take notes" FontWeight="SemiBold"/><TextBox Text="{Binding SelectedTake.Notes}" AcceptsReturn="True" MinHeight="80" />
-        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8"><Button Content="Copy Code" Click="CopyCode_Click"/><Button Grid.Column="1" Content="Dry Run" Click="DryRun_Click"/><Button Grid.Column="2" Content="Start Take" Click="StartTake_Click"/><Button Grid.Column="3" Content="Mark Complete" Click="Complete_Click"/></Grid>
-        <Button Content="Needs Retake" Click="NeedsRetake_Click" HorizontalAlignment="Left" />
-        <Button Content="Create Retake Attempt" Click="Retake_Click" HorizontalAlignment="Left" />
-        <TextBlock Text="Sync / editor exports" FontSize="18" FontWeight="SemiBold" />
-        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8"><Button Content="Export JSON…" Click="ExportJson_Click"/><Button Grid.Column="1" Content="Export CSV…" Click="ExportCsv_Click"/><Button Grid.Column="2" Content="Export Sync WAV…" Click="ExportWave_Click"/></Grid>
+      <TextBlock Text="{DynamicResource TakeNotes}" FontWeight="SemiBold"/><TextBox Text="{Binding SelectedTake.Notes}" AcceptsReturn="True" MinHeight="80" />
+      <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8"><Button Content="{DynamicResource CopyCode}" Click="CopyCode_Click"/><Button Grid.Column="1" Content="{DynamicResource DryRun}" Click="DryRun_Click"/><Button Grid.Column="2" Content="{DynamicResource StartTake}" Click="StartTake_Click"/><Button Grid.Column="3" Content="{DynamicResource MarkComplete}" Click="Complete_Click"/></Grid>
+      <Button Content="{DynamicResource NeedsRetake}" Click="NeedsRetake_Click" HorizontalAlignment="Left" />
+      <Button Content="{DynamicResource CreateRetake}" Click="Retake_Click" HorizontalAlignment="Left" />
+      <TextBlock Text="{DynamicResource SyncExports}" FontSize="18" FontWeight="SemiBold" />
+      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8"><Button Content="{DynamicResource ExportJson}" Click="ExportJson_Click"/><Button Grid.Column="1" Content="{DynamicResource ExportCsv}" Click="ExportCsv_Click"/><Button Grid.Column="2" Content="{DynamicResource ExportSyncWave}" Click="ExportWave_Click"/></Grid>
         <Border Padding="22" BorderThickness="2" BorderBrush="{DynamicResource SystemAccentColor}" Margin="0,18,0,0">
-          <StackPanel HorizontalAlignment="Center"><TextBlock Text="3  2  1" FontSize="36" HorizontalAlignment="Center"/><TextBlock Text="SYNC" FontSize="48" FontWeight="Bold" HorizontalAlignment="Center"/><TextBlock Text="PLAYING" FontSize="24" HorizontalAlignment="Center"/><Button Content="EMERGENCY STOP" Background="#B3261E" Foreground="White" Margin="0,12,0,0" Click="EmergencyStop_Click"/></StackPanel>
+        <StackPanel HorizontalAlignment="Center"><TextBlock Text="{DynamicResource Countdown}" FontSize="36" HorizontalAlignment="Center"/><TextBlock Text="{DynamicResource Sync}" FontSize="48" FontWeight="Bold" HorizontalAlignment="Center"/><TextBlock Text="{DynamicResource Playing}" FontSize="24" HorizontalAlignment="Center"/><Button Content="{DynamicResource EmergencyStop}" Background="#B3261E" Foreground="White" Margin="0,12,0,0" Click="EmergencyStop_Click"/></StackPanel>
         </Border>
         <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.8" />
       </StackPanel>

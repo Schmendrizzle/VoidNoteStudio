@@ -1,10 +1,48 @@
-bin/
-obj/
+# .NET / IDE
+**/bin/
+**/obj/
 .vs/
 .idea/
+.vscode/
 *.user
 *.suo
 TestResults/
 artifacts/
+
+# Local VoidNote data and recovery files
 *.vns
+*.vns.autosave
+*.vns.recovery.json
+*.v?.bak
 *.log
+logs/
+
+# Python / AI workers and models
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.python-version
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+models/
+
+# Temporary/editor files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+secrets.json
+appsettings.Local.json

@@ -11,6 +11,10 @@ using VoidNote.GameBridge.Playback;
 using VoidNote.GameBridge.Profiles;
 using Microsoft.Extensions.Logging;
 using VoidNote.Shawzin.Ensemble;
+using VoidNote.Application.Diagnostics;
+using VoidNote.Application.Jobs;
+using VoidNote.Application.Projects;
+using System.Reflection;
 
 namespace VoidNote.App.ViewModels;
 
@@ -18,7 +22,10 @@ namespace VoidNote.App.ViewModels;
 public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiShawzinWorkflow multiWorkflow,
     IShawzinEnsembleArranger ensembleArranger, GameBridgePlaybackSession gameBridge,
     KeybindProfileService profileService, ISettingsStore settingsStore, ILogger<MainWindowViewModel> logger,
-    AudioLabViewModel audioLab, CreatorModeViewModel creatorMode, MandachordStudioViewModel mandachordStudio) : INotifyPropertyChanged
+    AudioLabViewModel audioLab, CreatorModeViewModel creatorMode, MandachordStudioViewModel mandachordStudio,
+    IProjectStore projectStore, IProjectRecoveryService recoveryService, IVoidNoteDiagnosticsService diagnostics,
+    IBackgroundJobManager jobs, IShawzinValidationTool shawzinValidation,
+    IShawzinValidationRecordStore validationRecordStore) : INotifyPropertyChanged, IAsyncDisposable
 {
     private readonly IShawzinStudioWorkflow _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
     private ProjectTimeline? _timeline;
@@ -49,6 +56,19 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     private string _ensembleReport = "Not split";
     private string _ensembleDetails = string.Empty;
     private ShawzinEnsemble? _ensemble;
+    private VoidNoteProject _project = new();
+    private string? _projectPath;
+    private bool _isDirty;
+    private IReadOnlyList<RecentProjectViewModel> _recentProjects = [];
+    private RecentProjectViewModel? _selectedRecentProject;
+    private RecoveryCandidate? _pendingRecovery;
+    private string _diagnosticsText = "Diagnostics have not been run.";
+    private CancellationTokenSource? _autosaveCancellation;
+    private Task _autosaveLoop = Task.CompletedTask;
+    private readonly SemaphoreSlim _autosaveGate = new(1, 1);
+    private string _validationCode = string.Empty;
+    private string _validationReport = "Paste a Shawzin code to decode, validate and re-encode it.";
+    private string _mappingSequence = string.Empty;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public AudioLabViewModel AudioLab { get; } = audioLab;
@@ -60,6 +80,31 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     public IReadOnlyList<StrategyChoice> Strategies => StrategyChoice.All;
     public IReadOnlyList<int> ShawzinCounts { get; } = [2, 3, 4];
     public IReadOnlyList<MultiShawzinSplitStrategy> SplitStrategies { get; } = Enum.GetValues<MultiShawzinSplitStrategy>();
+    public IReadOnlyList<ThemePreference> Themes { get; } = Enum.GetValues<ThemePreference>();
+    public IReadOnlyList<AutosaveInterval> AutosaveIntervals { get; } = Enum.GetValues<AutosaveInterval>();
+    public IReadOnlyList<string> Cultures { get; } = ["en", "de"];
+    public string ApplicationVersion => typeof(MainWindowViewModel).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+    public VoidNoteProject Project => _project;
+    public string ProjectName => _project.Metadata.Title;
+    public string ProjectPath => _projectPath ?? "Not saved yet";
+    public bool IsDirty { get => _isDirty; private set { if (Set(ref _isDirty, value)) OnPropertyChanged(nameof(ProjectState)); } }
+    public string ProjectState => IsDirty ? "Unsaved changes" : "Saved";
+    public string ActiveJobs => jobs.Jobs.Count(value => value.State is BackgroundJobState.Queued or BackgroundJobState.Running) is var count && count > 0 ? $"{count} background job(s)" : "No background jobs";
+    public IReadOnlyList<RecentProjectViewModel> RecentProjects { get => _recentProjects; private set => Set(ref _recentProjects, value); }
+    public RecentProjectViewModel? SelectedRecentProject { get => _selectedRecentProject; set => Set(ref _selectedRecentProject, value); }
+    public RecoveryCandidate? PendingRecovery { get => _pendingRecovery; private set { if (Set(ref _pendingRecovery, value)) OnPropertyChanged(nameof(HasPendingRecovery)); } }
+    public bool HasPendingRecovery => PendingRecovery is not null;
+    public string DiagnosticsText { get => _diagnosticsText; private set => Set(ref _diagnosticsText, value); }
+    public string ValidationCode { get => _validationCode; set => Set(ref _validationCode, value); }
+    public string ValidationReport { get => _validationReport; private set => Set(ref _validationReport, value); }
+    public string MappingSequence { get => _mappingSequence; private set => Set(ref _mappingSequence, value); }
+    public string SelectedCulture { get => _settings.General.Culture; set { _settings = _settings with { General = _settings.General with { Culture = value } }; OnPropertyChanged(); } }
+    public ThemePreference SelectedTheme { get => _settings.Appearance.Theme; set { _settings = _settings with { Appearance = _settings.Appearance with { Theme = value } }; OnPropertyChanged(); } }
+    public AutosaveInterval SelectedAutosaveInterval { get => _settings.Autosave.Interval; set { _settings = _settings with { Autosave = _settings.Autosave with { Interval = value } }; OnPropertyChanged(); RestartAutosaveLoop(); } }
+    public string FfmpegPath { get => _settings.Audio.FfmpegExecutablePath ?? "ffmpeg"; set { _settings = _settings with { Audio = _settings.Audio with { FfmpegExecutablePath = value } }; OnPropertyChanged(); } }
+    public string FfplayPath { get => _settings.Audio.FfplayExecutablePath ?? "ffplay"; set { _settings = _settings with { Audio = _settings.Audio with { FfplayExecutablePath = value } }; OnPropertyChanged(); } }
+    public string PythonPath { get => _settings.AudioIntelligence.PythonExecutablePath ?? "python"; set { _settings = _settings with { AudioIntelligence = _settings.AudioIntelligence with { PythonExecutablePath = value } }; OnPropertyChanged(); } }
+    public string WorkerPath { get => _settings.AudioIntelligence.WorkerScriptPath ?? Path.Combine(AppContext.BaseDirectory, "workers", "python", "voidnote_ai_worker.py"); set { _settings = _settings with { AudioIntelligence = _settings.AudioIntelligence with { WorkerScriptPath = value } }; OnPropertyChanged(); } }
 
     public MidiTrack? SelectedTrack { get => _selectedTrack; set => Set(ref _selectedTrack, value); }
     public ShawzinDefinition SelectedInstrument { get => _selectedInstrument; set => Set(ref _selectedInstrument, value); }
@@ -106,11 +151,89 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
 
     public async Task InitializeAsync(CancellationToken token = default)
     {
+        SetProject(AudioLab.Project, null, false);
         _settings = await settingsStore.LoadAsync(token);
+        RecentProjects = _settings.RecentProjects.Select(value => new RecentProjectViewModel(value)).ToArray();
+        PendingRecovery = (await recoveryService.FindRecoverableAsync(token)).FirstOrDefault();
         KeybindProfiles = await profileService.LoadAsync(token);
         SelectedKeybindProfile = KeybindProfiles.FirstOrDefault();
         GameBridgeStatus = "DISARMED";
-        OnPropertyChanged(nameof(GameBridgeAvailability)); OnPropertyChanged(nameof(DisclaimerAcknowledged));
+        AudioLab.ProjectChanged += AudioLabProjectChanged;
+        jobs.JobChanged += JobsChanged;
+        RestartAutosaveLoop();
+        OnPropertyChanged(nameof(GameBridgeAvailability)); OnPropertyChanged(nameof(DisclaimerAcknowledged)); OnPropertyChanged(nameof(SelectedCulture)); OnPropertyChanged(nameof(SelectedTheme)); OnPropertyChanged(nameof(SelectedAutosaveInterval));
+    }
+
+    public void NewProject()
+    {
+        SetProject(new VoidNoteProject { Metadata = new() { Title = "Untitled" } }, null, true);
+        Status = "New project created.";
+    }
+
+    public async Task OpenProjectAsync(string path, CancellationToken token = default)
+    {
+        var project = await projectStore.LoadAsync(path, token);
+        SetProject(project, Path.GetFullPath(path), false);
+        await RememberProjectAsync(token);
+        Status = $"Opened project '{project.Metadata.Title}'.";
+    }
+
+    public async Task SaveProjectAsync(string path, CancellationToken token = default)
+    {
+        _projectPath = Path.GetFullPath(path);
+        await projectStore.SaveAsync(_project, _projectPath, token);
+        IsDirty = false; await RememberProjectAsync(token);
+        OnPropertyChanged(nameof(ProjectPath)); Status = $"Saved project '{ProjectName}'.";
+    }
+
+    public Task SaveProjectAsync(CancellationToken token = default) => _projectPath is null
+        ? throw new InvalidOperationException("Choose a project file before saving.")
+        : SaveProjectAsync(_projectPath, token);
+
+    public async Task OpenSelectedRecentProjectAsync(CancellationToken token = default)
+    {
+        if (SelectedRecentProject is null || SelectedRecentProject.IsMissing) return;
+        await OpenProjectAsync(SelectedRecentProject.Path, token);
+    }
+
+    public async Task RecoverAsync(CancellationToken token = default)
+    {
+        if (PendingRecovery is null) return;
+        var candidate = PendingRecovery;
+        var project = await recoveryService.RecoverAsync(candidate, token);
+        SetProject(project, candidate.OriginalProjectPath, true);
+        PendingRecovery = null; Status = $"Recovered '{project.Metadata.Title}'. Save explicitly to keep the recovered version.";
+    }
+
+    public async Task DiscardRecoveryAsync(CancellationToken token = default)
+    {
+        if (PendingRecovery is null) return;
+        await recoveryService.DiscardAsync(PendingRecovery, token); PendingRecovery = null;
+    }
+
+    public async Task RunDiagnosticsAsync(CancellationToken token = default) => DiagnosticsText = (await diagnostics.RunAsync(token)).ToText();
+    public async Task<string> ExportDiagnosticsJsonAsync(CancellationToken token = default) => (await diagnostics.RunAsync(token)).ToJson();
+    public async Task SaveSettingsAsync(CancellationToken token = default)
+    {
+        _settings = _settings with { General = _settings.General with { FirstRunCompleted = true } };
+        await settingsStore.SaveAsync(_settings, token); Status = "Settings saved. Language and theme are applied reliably after restart.";
+    }
+
+    public void ValidateShawzinCode()
+    {
+        var report = shawzinValidation.Validate(ValidationCode.Trim(), SelectedInstrument);
+        ValidationReport = $"Valid: {report.IsValid}\nInstrument profile: {report.InstrumentProfile}\nEvents: {report.EventCount}\nDuration: {report.DurationSeconds:0.####} s\nSpacing: {report.MinimumSpacingSeconds:0.####}..{report.MaximumSpacingSeconds:0.####} s\nRe-encoded: {report.ReEncodedCode}\n" +
+            string.Join(Environment.NewLine, report.Differences.Concat(report.Errors));
+    }
+
+    public void GenerateMappingSequence() => MappingSequence = shawzinValidation.CreateMappingTestSequence(SelectedInstrument, SelectedScale);
+
+    public async Task SaveMappingValidationAsync(bool confirmed, CancellationToken token = default)
+    {
+        if (string.IsNullOrWhiteSpace(MappingSequence)) GenerateMappingSequence();
+        await validationRecordStore.SaveAsync(new(Guid.NewGuid(), DateTimeOffset.UtcNow, SelectedInstrument.Id, SelectedScale, MappingSequence, confirmed,
+            "Manual in-game validation; no Warframe process inspection was performed."), token);
+        Status = "Local Shawzin mapping validation record saved.";
     }
 
     public async Task LoadMidiFileAsync(string path, CancellationToken cancellationToken = default)
@@ -118,6 +241,8 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         var import = await _workflow.ImportMidiFileAsync(path, cancellationToken);
         _timeline = import.Timeline;
         Tracks = import.Tracks;
+        _project = new VoidNoteProject { Metadata = new() { Title = Path.GetFileNameWithoutExtension(path) }, Timeline = import.Timeline, MidiTracks = [.. import.Tracks] };
+        _projectPath = null; IsDirty = true; AudioLab.LoadProject(_project); OnPropertyChanged(nameof(Project)); OnPropertyChanged(nameof(ProjectName)); OnPropertyChanged(nameof(ProjectPath));
         MandachordStudio.Prepare(import.Timeline, import.Tracks);
         SelectedTrack = Tracks.FirstOrDefault();
         OnPropertyChanged(nameof(Tracks));
@@ -145,6 +270,11 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         SongCode = result.Encoding?.Code ?? string.Empty;
         _previewWave = result.Preview?.WaveData;
         _arrangedTrack = result.Arrangement.Track;
+        if (_arrangedTrack is not null)
+        {
+            _project.ShawzinTracks.RemoveAll(value => value.Id == _arrangedTrack.Id);
+            _project.ShawzinTracks.Add(_arrangedTrack); IsDirty = true;
+        }
         OnPropertyChanged(nameof(HasPreview));
         Status = result.Arrangement.IsSuccess
             ? $"Arranged {result.Arrangement.Report.OutputNoteCount} notes with {result.Arrangement.Report.Changes.Count} reported changes."
@@ -160,8 +290,9 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
             Strategy = SplitStrategy,
         });
         _ensemble = result.Ensemble;
-        var creatorProject = new VoidNoteProject { Metadata = new ProjectMetadata { Title = "Creator Project" }, Timeline = _timeline };
-        CreatorMode.Prepare(creatorProject, result.Ensemble, result.Export);
+        foreach (var track in result.Ensemble.Tracks.Select(value => value.ShawzinTrack).OfType<ShawzinTrack>())
+            if (_project.ShawzinTracks.All(value => value.Id != track.Id)) _project.ShawzinTracks.Add(track);
+        CreatorMode.Prepare(_project, result.Ensemble, result.Export); IsDirty = true;
         _previewWave = result.Preview.WaveData;
         var exports = result.Export.Tracks.ToDictionary(value => value.TrackId);
         EnsembleTracks = result.Ensemble.Tracks.Select(track => new EnsembleTrackViewModel(result.Ensemble, track, ensembleArranger, RefreshEnsemble)
@@ -287,6 +418,69 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     }
     private static string Get(ShawzinKeybindProfile? profile, ShawzinInputBinding binding) => profile is not null && profile.Bindings.TryGetValue(binding, out var key) ? key : string.Empty;
 
+    private void SetProject(VoidNoteProject project, string? path, bool dirty)
+    {
+        _project = project; _projectPath = path; _timeline = project.Timeline; Tracks = project.MidiTracks;
+        SelectedTrack = Tracks.FirstOrDefault(); AudioLab.LoadProject(project); MandachordStudio.Prepare(project.Timeline, project.MidiTracks);
+        IsDirty = dirty; OnPropertyChanged(nameof(Project)); OnPropertyChanged(nameof(ProjectName)); OnPropertyChanged(nameof(ProjectPath)); OnPropertyChanged(nameof(Tracks));
+    }
+
+    private async Task RememberProjectAsync(CancellationToken token)
+    {
+        if (_projectPath is null) return;
+        var recent = VoidNote.Application.Projects.RecentProjects.AddOrUpdate(_settings.RecentProjects, ProjectName, _projectPath, DateTimeOffset.UtcNow);
+        _settings = _settings with { RecentProjects = recent, General = _settings.General with { FirstRunCompleted = true } };
+        RecentProjects = recent.Select(value => new RecentProjectViewModel(value)).ToArray();
+        await settingsStore.SaveAsync(_settings, token);
+    }
+
+    private void AudioLabProjectChanged(object? sender, EventArgs e) => IsDirty = true;
+    private void JobsChanged(object? sender, BackgroundJob e) => OnPropertyChanged(nameof(ActiveJobs));
+
+    private void RestartAutosaveLoop()
+    {
+        _autosaveCancellation?.Cancel(); _autosaveCancellation?.Dispose();
+        var interval = _settings.Autosave.GetInterval();
+        if (interval == Timeout.InfiniteTimeSpan) { _autosaveCancellation = null; _autosaveLoop = Task.CompletedTask; return; }
+        _autosaveCancellation = new CancellationTokenSource();
+        _autosaveLoop = RunAutosaveLoopAsync(interval, _autosaveCancellation.Token);
+    }
+
+    private async Task RunAutosaveLoopAsync(TimeSpan interval, CancellationToken token)
+    {
+        using var timer = new PeriodicTimer(interval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(token))
+                if (IsDirty) await WriteAutosaveAsync(token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception exception) { logger.LogError(exception, "Autosave failed"); }
+    }
+
+    private async Task WriteAutosaveAsync(CancellationToken token)
+    {
+        await _autosaveGate.WaitAsync(token);
+        try { await recoveryService.WriteAutosaveAsync(_project, _projectPath, token); }
+        finally { _autosaveGate.Release(); }
+    }
+
+    public async Task ShutdownAsync(CancellationToken token = default)
+    {
+        _autosaveCancellation?.Cancel();
+        try { await _autosaveLoop.WaitAsync(token); } catch (OperationCanceledException) when (_autosaveCancellation?.IsCancellationRequested == true) { }
+        await _autosaveGate.WaitAsync(token); _autosaveGate.Release();
+        await settingsStore.SaveAsync(_settings, token);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        AudioLab.ProjectChanged -= AudioLabProjectChanged; jobs.JobChanged -= JobsChanged;
+        _autosaveCancellation?.Cancel();
+        try { await _autosaveLoop; } catch (OperationCanceledException) { }
+        _autosaveCancellation?.Dispose(); _autosaveGate.Dispose();
+    }
+
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
@@ -296,6 +490,15 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+}
+
+public sealed record RecentProjectViewModel(RecentProjectSettings Settings)
+{
+    public string Name => Settings.Name;
+    public string Path => Settings.Path;
+    public DateTimeOffset LastOpened => Settings.LastOpenedUtc.ToLocalTime();
+    public bool IsMissing => !File.Exists(Settings.Path);
+    public string Availability => IsMissing ? "Missing" : "Available";
 }
 
 /// <summary>Editable presentation wrapper around one independently arranged ensemble track.</summary>

@@ -1,8 +1,8 @@
-# VoidNote Studio – Architekturstand Milestone J
+# VoidNote Studio – Architekturstand Milestone K / 1.0.0-rc1
 
 ## Geltungsbereich
 
-Dieses Dokument beschreibt die implementierte Architektur nach **Milestone J – Mandachord Studio**. Mandachord ist ein eigenes Modul auf dem normalisierten Musikmodell und besitzt keinerlei GameBridge-/OS-Input-Pfad.
+Dieses Dokument beschreibt die implementierte Architektur nach **Milestone K – Release Readiness, Polish & Validation**. Mandachord bleibt ein eigenes Modul auf dem normalisierten Musikmodell und besitzt keinerlei GameBridge-/OS-Input-Pfad. Milestone K ergänzt Release-Dienste, aber kein neues Produktmodul.
 
 ## Technische Basis
 
@@ -147,6 +147,18 @@ Die Bridge ist standardmäßig disarmed. Profilvalidierung, Fokusprüfung und Ca
 Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `project.json`; eingebettete Audioquellen liegen unverändert unter `audio/`, Stem-Assets unter `stems/`, externe Referenzen bleiben explizit relativ oder absolut. Settings und Projekte werden atomar geschrieben; Logging bleibt lokal und ohne Telemetrie; Undo/Redo bleibt UI-unabhängig. Ältere Version-1-Projekte bleiben ladbar. Unvollständige v1-Stem-Platzhalter werden als `LegacyStemReferences` verlustfrei bewahrt, statt erfundene Engine-Provenienz zu erhalten.
 
 Creator Sessions sind Teil der Projektwurzel. Session, Takes, Sections, Statushistorie, Checklisten, Notizen, Range-Zuordnung und deterministische Sync-Metadaten werden in `project.json` persistiert. Die Domain bleibt frei von Avalonia, Audio-Engine-, GameBridge- und Videoabhängigkeiten. Application-Services planen, exportieren und koordinieren; die minimale Creator-Ansicht projiziert diese Services nur.
+
+## Release-Readiness-Dienste
+
+`IProjectRecoveryService` liegt als Application-Port vor; `ProjectRecoveryService` schreibt `.vns`-Snapshots samt minimaler Metadaten ausschließlich in den VoidNote-Recovery-Bereich. Es ersetzt nie die reguläre Projektdatei. Startup-Erkennung vergleicht Autosave- und Originalzeit, Recovery öffnet den Snapshot als unsaved state, Discard löscht nur owned Recovery-Dateien.
+
+Settings Schema 2 ergänzt Autosave, First Run, bounded Recent Projects und Backup-Retention. `JsonSettingsStore` migriert Schema 1, normalisiert Grenzen und fällt bei syntaktisch ungültigen Einstellungen auf sichere Defaults zurück. Sprache und Theme sind Domain-/Application-Enums; Avalonia lädt Deutsch/Englisch als ResourceDictionary und setzt System/Light/Dark beim Start.
+
+`IVoidNoteDiagnosticsService` liefert UI-unabhängige Capability-DTOs und exportiert Text/JSON. Die Infrastructure-Implementierung prüft .NET, OS, FFmpeg/FFplay, Python, Worker, Demucs, Basic Pitch, Schreibrechte und Temp sowie injizierte Audio-/GameBridge-Capabilities mit argumentgetrennten, zeitbegrenzten Prozessen. Installationen werden niemals ausgelöst.
+
+Der `.vns`-Adapter validiert vor Manifestdeserialisierung Entryanzahl, eindeutige relative Pfade, Symlinkfreiheit und gesamte Expanded Size. Embedded Assets besitzen Einzelgrößen-/Kompressionsgrenzen und einen limitierenden Kopierpfad zu GUID-basierten Zielen. Diese Härtung bleibt vollständig in Infrastructure; Domain und Formatmodell kennen keine ZIP-APIs.
+
+Shutdown bricht Background Jobs ab, stoppt Audio und GameBridge/held keys, wartet auf Autosave, speichert Settings und räumt markierte AI-Tempordner best-effort auf. Ein Cleanupfehler wird lokal geloggt und verhindert die übrigen Schritte nicht.
 
 ## Bewusst offene Punkte nach Milestone J
 

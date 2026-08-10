@@ -28,6 +28,7 @@ public interface IBackgroundJobManager
     event EventHandler<BackgroundJob>? JobChanged;
     Task<T> RunAsync<T>(string name, Func<IProgress<JobProgress>, CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken = default);
+    Task CancelAllAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>Runs cancellable work off the UI context and preserves observable status.</summary>
@@ -56,6 +57,17 @@ public sealed class BackgroundJobManager : IBackgroundJobManager
         catch (Exception exception)
         { job.Error = exception; job.State = BackgroundJobState.Failed; Notify(job); throw; }
         finally { linked.Dispose(); }
+    }
+
+    public async Task CancelAllAsync(CancellationToken cancellationToken = default)
+    {
+        var running = _jobs.Values.Where(job => job.State is BackgroundJobState.Queued or BackgroundJobState.Running).ToArray();
+        foreach (var job in running) job.Cancel();
+        while (running.Any(job => job.State is BackgroundJobState.Queued or BackgroundJobState.Running))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.Delay(25, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private void Notify(BackgroundJob job) => JobChanged?.Invoke(this, job);

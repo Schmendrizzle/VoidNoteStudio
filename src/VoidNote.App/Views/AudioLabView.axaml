@@ -6,12 +6,12 @@
              x:DataType="vm:AudioLabViewModel">
   <Grid Margin="22" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="14">
     <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
-      <Button Content="Import audio…" Click="ImportAudio_Click" />
-      <Button Grid.Column="1" Content="Zoom −" Click="ZoomOut_Click" />
-      <Button Grid.Column="2" Content="Zoom +" Click="ZoomIn_Click" />
-      <Button Grid.Column="3" Content="Clear waveform cache" Click="ClearCache_Click" />
+      <Button Content="{DynamicResource ImportAudio}" Click="ImportAudio_Click" />
+      <Button Grid.Column="1" Content="{DynamicResource ZoomOut}" Click="ZoomOut_Click" />
+      <Button Grid.Column="2" Content="{DynamicResource ZoomIn}" Click="ZoomIn_Click" />
+      <Button Grid.Column="3" Content="{DynamicResource ClearWaveformCache}" Click="ClearCache_Click" />
       <ProgressBar Grid.Column="4" Minimum="0" Maximum="1" Value="{Binding Progress}" VerticalAlignment="Center" />
-      <Button Grid.Column="5" Content="Cancel job" Click="Cancel_Click" />
+      <Button Grid.Column="5" Content="{DynamicResource CancelJob}" Click="Cancel_Click" />
     </Grid>
     <Grid Grid.Row="1" ColumnDefinitions="300,*" ColumnSpacing="14">
       <ListBox ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}">
@@ -21,17 +21,17 @@
               <TextBox Text="{Binding Name}" />
               <TextBlock Text="{Binding Details}" TextWrapping="Wrap" Opacity="0.75" />
               <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
-                <TextBlock Text="Gain" VerticalAlignment="Center" />
+                  <TextBlock Text="{DynamicResource Gain}" VerticalAlignment="Center" />
                 <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2" Increment="0.05" Value="{Binding Gain}" />
-                <CheckBox Grid.Column="2" Content="Mute" IsChecked="{Binding IsMuted}" />
-                <CheckBox Grid.Column="3" Content="Solo" IsChecked="{Binding IsSolo}" />
+                  <CheckBox Grid.Column="2" Content="{DynamicResource Mute}" IsChecked="{Binding IsMuted}" />
+                  <CheckBox Grid.Column="3" Content="{DynamicResource Solo}" IsChecked="{Binding IsSolo}" />
               </Grid>
               <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
-                <TextBlock Text="Start (s)" VerticalAlignment="Center" />
+                  <TextBlock Text="{DynamicResource StartSeconds}" VerticalAlignment="Center" />
                 <NumericUpDown Grid.Column="1" Minimum="0" Value="{Binding StartSeconds}" />
-                <CheckBox Grid.Column="2" Content="Active" IsChecked="{Binding IsEnabled}" />
+                  <CheckBox Grid.Column="2" Content="{DynamicResource Active}" IsChecked="{Binding IsEnabled}" />
               </Grid>
-              <Button Content="Remove (Undo/Redo)" Click="RemoveTrack_Click" />
+                <Button Content="{DynamicResource RemoveUndoRedo}" Click="RemoveTrack_Click" />
             </StackPanel>
           </Border>
         </DataTemplate></ListBox.ItemTemplate>
@@ -44,58 +44,58 @@
              SelectionEndSeconds="{Binding SelectionEndSeconds}" />
         </ScrollViewer>
         <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
-          <Button Content="Play" Click="Play_Click" /><Button Grid.Column="1" Content="Pause" Click="Pause_Click" />
-          <Button Grid.Column="2" Content="Stop" Click="Stop_Click" /><Button Grid.Column="3" Content="Seek" Click="Seek_Click" />
+          <Button Content="{DynamicResource Play}" Click="Play_Click" /><Button Grid.Column="1" Content="{DynamicResource Pause}" Click="Pause_Click" />
+          <Button Grid.Column="2" Content="{DynamicResource Stop}" Click="Stop_Click" /><Button Grid.Column="3" Content="{DynamicResource Seek}" Click="Seek_Click" />
           <Slider Grid.Column="4" Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding PlayheadSeconds}" />
-          <CheckBox Grid.Column="5" Content="Loop selection" IsChecked="{Binding LoopEnabled}" />
+          <CheckBox Grid.Column="5" Content="{DynamicResource LoopSelection}" IsChecked="{Binding LoopEnabled}" />
         </Grid>
         <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8">
-          <TextBlock Text="Selection start" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding SelectionStartSeconds}" />
-          <TextBlock Grid.Column="2" Text="End" VerticalAlignment="Center" /><NumericUpDown Grid.Column="3" Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding SelectionEndSeconds}" />
+          <TextBlock Text="{DynamicResource SelectionStart}" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding SelectionStartSeconds}" />
+          <TextBlock Grid.Column="2" Text="{DynamicResource End}" VerticalAlignment="Center" /><NumericUpDown Grid.Column="3" Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding SelectionEndSeconds}" />
         </Grid>
       </Grid>
     </Grid>
     <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="14">
-      <Expander Header="Separation" IsExpanded="True">
+      <Expander Header="{DynamicResource Separation}" IsExpanded="True">
         <StackPanel Spacing="8" Margin="8">
           <TextBlock Text="{Binding EngineStatus}" TextWrapping="Wrap" Opacity="0.75" />
           <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-            <TextBlock Text="Engine" VerticalAlignment="Center" />
+            <TextBlock Text="{DynamicResource Engine}" VerticalAlignment="Center" />
             <ComboBox Grid.Column="1" ItemsSource="{Binding SeparationEngines}" SelectedItem="{Binding SelectedSeparationEngine, Mode=OneWay}" />
           </Grid>
           <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
-            <TextBlock Text="Compute" VerticalAlignment="Center" />
+            <TextBlock Text="{DynamicResource Compute}" VerticalAlignment="Center" />
             <ComboBox Grid.Column="1" ItemsSource="{Binding ComputeDevices}" SelectedItem="{Binding ComputeDevice}" />
-            <Button Grid.Column="2" Content="Check engines" Click="DiscoverEngines_Click" />
-            <Button Grid.Column="3" Content="Separate" Click="Separate_Click" />
+            <Button Grid.Column="2" Content="{DynamicResource CheckEngines}" Click="DiscoverEngines_Click" />
+            <Button Grid.Column="3" Content="{DynamicResource Separate}" Click="Separate_Click" />
           </Grid>
           <ListBox ItemsSource="{Binding Stems}" SelectedItem="{Binding SelectedStem}" MaxHeight="120">
             <ListBox.ItemTemplate><DataTemplate x:DataType="vm:StemRowViewModel">
               <StackPanel Margin="6"><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Details}" Opacity="0.7"/></StackPanel>
             </DataTemplate></ListBox.ItemTemplate>
           </ListBox>
-          <Button Content="Remove selected stem set (Undo/Redo)" Click="RemoveStemSet_Click" />
+          <Button Content="{DynamicResource RemoveStemSet}" Click="RemoveStemSet_Click" />
           <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-            <Button Content="A: Original" Click="Original_Click" />
-            <Button Grid.Column="1" Content="B: Selected stem" Click="Stem_Click" />
-            <Button Grid.Column="2" Content="Play stem mix" Click="StemMix_Click" />
+            <Button Content="{DynamicResource Original}" Click="Original_Click" />
+            <Button Grid.Column="1" Content="{DynamicResource SelectedStem}" Click="Stem_Click" />
+            <Button Grid.Column="2" Content="{DynamicResource PlayStemMix}" Click="StemMix_Click" />
           </Grid>
         </StackPanel>
       </Expander>
-      <Expander Grid.Column="1" Header="Transcription" IsExpanded="True">
+      <Expander Grid.Column="1" Header="{DynamicResource Transcription}" IsExpanded="True">
         <StackPanel Spacing="8" Margin="8">
           <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-            <TextBlock Text="Engine" VerticalAlignment="Center" />
+            <TextBlock Text="{DynamicResource Engine}" VerticalAlignment="Center" />
             <ComboBox Grid.Column="1" ItemsSource="{Binding TranscriptionEngines}" SelectedItem="{Binding SelectedTranscriptionEngine, Mode=OneWay}" />
           </Grid>
           <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8">
-            <TextBlock Text="Mode" VerticalAlignment="Center"/><ComboBox Grid.Column="1" ItemsSource="{Binding TranscriptionModes}" SelectedItem="{Binding TranscriptionMode}"/>
-            <TextBlock Grid.Column="2" Text="Quantize" VerticalAlignment="Center"/><ComboBox Grid.Column="3" ItemsSource="{Binding Quantizations}" SelectedItem="{Binding Quantization}"/>
+            <TextBlock Text="{DynamicResource Mode}" VerticalAlignment="Center"/><ComboBox Grid.Column="1" ItemsSource="{Binding TranscriptionModes}" SelectedItem="{Binding TranscriptionMode}"/>
+            <TextBlock Grid.Column="2" Text="{DynamicResource Quantize}" VerticalAlignment="Center"/><ComboBox Grid.Column="3" ItemsSource="{Binding Quantizations}" SelectedItem="{Binding Quantization}"/>
           </Grid>
           <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-            <TextBlock Text="Minimum confidence" VerticalAlignment="Center"/>
+            <TextBlock Text="{DynamicResource MinimumConfidence}" VerticalAlignment="Center"/>
             <NumericUpDown Grid.Column="1" Minimum="0" Maximum="1" Increment="0.05" Value="{Binding ConfidenceThreshold}"/>
-            <Button Grid.Column="2" Content="Transcribe to MIDI" Click="Transcribe_Click"/>
+            <Button Grid.Column="2" Content="{DynamicResource TranscribeMidi}" Click="Transcribe_Click"/>
           </Grid>
           <TextBlock Text="{Binding TranscriptionMetrics}" TextWrapping="Wrap"/>
         </StackPanel>
