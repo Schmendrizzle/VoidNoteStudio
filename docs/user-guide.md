@@ -6,7 +6,7 @@ Extract the complete official `win-x64` ZIP or `linux-x64` tarball before starti
 
 ## Projects and recovery
 
-Create or open projects from **Project**. `.vns` files are versioned ZIP containers; do not edit their contents manually. The header shows the open project, unsaved state and background jobs. Saving is atomic. Autosave uses separate recovery snapshots under application data and never replaces the normal `.vns` file. On the next start, a newer snapshot shows its project and time. **Recover** opens it as unsaved work; **Ignore / Discard** removes only that recovery snapshot.
+Create or open projects from **Project**. The editable project name is stored inside the project, cannot consist only of whitespace, and is independent of the `.vns` filename. Names are limited to 120 characters; filename-character restrictions do not apply. Renaming is undoable and marks the project as unsaved. `.vns` files are versioned ZIP containers; do not edit their contents manually. The header shows the open project, unsaved state and background jobs. Saving is atomic. The first Save dialog starts in the user's documents location; later Open and Save dialogs prefer the last successfully used project folder. Autosave uses separate recovery snapshots under application data and never replaces the normal `.vns` file. On the next start, a newer snapshot shows its project and time. **Recover** opens it as unsaved work; **Ignore / Discard** removes only that recovery snapshot.
 
 Recent Projects stores name, path and last-opened time locally. A missing path is labelled and is never moved, recreated or deleted automatically.
 

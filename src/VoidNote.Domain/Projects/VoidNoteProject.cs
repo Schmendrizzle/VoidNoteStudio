@@ -77,10 +77,8 @@ public sealed class VoidNoteProject
             throw new InvalidOperationException("A project ID cannot be empty.");
         }
 
-        if (string.IsNullOrWhiteSpace(Metadata.Title))
-        {
-            throw new InvalidOperationException("A project title cannot be empty.");
-        }
+        try { _ = ProjectName.Normalize(Metadata.Title); }
+        catch (ArgumentException exception) { throw new InvalidOperationException(exception.Message, exception); }
 
         var ids = AudioSources.Cast<ProjectItem>()
             .Concat(AudioTracks)

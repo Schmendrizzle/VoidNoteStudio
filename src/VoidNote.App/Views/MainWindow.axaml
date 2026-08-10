@@ -36,6 +36,17 @@
                 <Button Grid.Column="1" Content="{DynamicResource OpenProject}" Click="OpenProject_Click" />
                 <Button Grid.Column="2" Content="{DynamicResource SaveProject}" Click="SaveProject_Click" ToolTip.Tip="Ctrl+S" />
               </Grid>
+              <TextBlock Text="{DynamicResource ProjectName}" FontWeight="SemiBold" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBox Text="{Binding ProjectNameDraft}" MaxLength="{Binding ProjectNameMaximumLength}" />
+                <Button Grid.Column="1" Content="{DynamicResource ApplyProjectName}" Click="RenameProject_Click" IsEnabled="{Binding IsProjectNameValid}" />
+              </Grid>
+              <TextBlock Text="{DynamicResource ProjectNameEmpty}" Foreground="Crimson" IsVisible="{Binding IsProjectNameEmpty}" />
+              <TextBlock Text="{DynamicResource ProjectNameHelp}" Opacity="0.7" TextWrapping="Wrap" />
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Content="{DynamicResource Undo}" Click="Undo_Click" IsEnabled="{Binding CanUndo}" ToolTip.Tip="Ctrl+Z" />
+                <Button Grid.Column="1" Content="{DynamicResource Redo}" Click="Redo_Click" IsEnabled="{Binding CanRedo}" ToolTip.Tip="Ctrl+Y" />
+              </Grid>
               <TextBlock Text="{DynamicResource ProjectPath}" FontWeight="SemiBold" />
               <TextBlock Text="{Binding ProjectPath}" TextWrapping="Wrap" />
               <TextBlock Text="{DynamicResource ProjectStatus}" FontWeight="SemiBold" />

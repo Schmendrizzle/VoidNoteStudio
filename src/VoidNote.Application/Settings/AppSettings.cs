@@ -68,6 +68,9 @@ public sealed record StorageSettings
     /// <summary>Gets the optional default project directory.</summary>
     public string? DefaultProjectDirectory { get; init; }
 
+    /// <summary>Gets the directory of the most recently opened or saved project.</summary>
+    public string? LastProjectDirectory { get; init; }
+
     /// <summary>Gets the maximum number of migration backups retained per project.</summary>
     public int MigrationBackupRetention { get; init; } = 3;
 }

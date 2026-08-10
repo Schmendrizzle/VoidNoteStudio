@@ -4,7 +4,7 @@ namespace VoidNote.Domain.Projects;
 public sealed class ProjectMetadata
 {
     /// <summary>Gets or initializes the project title.</summary>
-    public string Title { get; init; } = "Untitled";
+    public string Title { get; set; } = ProjectName.Default;
 
     /// <summary>Gets or initializes the optional project author.</summary>
     public string? Author { get; init; }

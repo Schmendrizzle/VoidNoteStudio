@@ -20,12 +20,17 @@ public sealed partial class MainWindow : Window
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext!;
 
     private void NewProject_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel.NewProject();
+    private void RenameProject_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel.RenameProject();
+    private void Undo_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel.Undo();
+    private void Redo_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => ViewModel.Redo();
 
     private async void OpenProject_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        var startLocation = await StorageProvider.TryGetFolderFromPathAsync(ViewModel.ProjectDialogDirectory);
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Open VoidNote project", AllowMultiple = false,
+            SuggestedStartLocation = startLocation,
             FileTypeFilter = [new FilePickerFileType("VoidNote project") { Patterns = ["*.vns"] }],
         });
         if (files.Count == 1) try { await ViewModel.OpenProjectAsync(files[0].Path.LocalPath); } catch (Exception exception) { await ShowErrorAsync("The project could not be opened.", exception); }
@@ -40,7 +45,8 @@ public sealed partial class MainWindow : Window
             if (Path.GetExtension(ViewModel.ProjectPath).Equals(".vns", StringComparison.OrdinalIgnoreCase)) { await ViewModel.SaveProjectAsync(); return; }
             var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "Save VoidNote project", SuggestedFileName = ViewModel.ProjectName + ".vns", DefaultExtension = "vns",
+                Title = "Save VoidNote project", SuggestedFileName = ViewModel.SuggestedProjectFileName, DefaultExtension = "vns",
+                SuggestedStartLocation = await StorageProvider.TryGetFolderFromPathAsync(ViewModel.ProjectDialogDirectory),
                 FileTypeChoices = [new FilePickerFileType("VoidNote project") { Patterns = ["*.vns"] }],
             });
             if (file is not null) await ViewModel.SaveProjectAsync(file.Path.LocalPath);
@@ -69,6 +75,8 @@ public sealed partial class MainWindow : Window
     {
         if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.S) { e.Handled = true; await SaveProjectAsync(); }
         else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.O) { e.Handled = true; OpenProject_Click(sender, new Avalonia.Interactivity.RoutedEventArgs()); }
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.Z) { e.Handled = true; ViewModel.Undo(); }
+        else if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.Y) { e.Handled = true; ViewModel.Redo(); }
     }
 
     private async void OpenMidi_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

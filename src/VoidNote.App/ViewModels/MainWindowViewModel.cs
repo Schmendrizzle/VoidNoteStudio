@@ -14,6 +14,7 @@ using VoidNote.Shawzin.Ensemble;
 using VoidNote.Application.Diagnostics;
 using VoidNote.Application.Jobs;
 using VoidNote.Application.Projects;
+using VoidNote.Application.Commands;
 using System.Reflection;
 
 namespace VoidNote.App.ViewModels;
@@ -25,7 +26,8 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     AudioLabViewModel audioLab, CreatorModeViewModel creatorMode, MandachordStudioViewModel mandachordStudio,
     IProjectStore projectStore, IProjectRecoveryService recoveryService, IVoidNoteDiagnosticsService diagnostics,
     IBackgroundJobManager jobs, IShawzinValidationTool shawzinValidation,
-    IShawzinValidationRecordStore validationRecordStore) : INotifyPropertyChanged, IAsyncDisposable
+    IShawzinValidationRecordStore validationRecordStore, IUndoRedoService history,
+    ProjectNameEditService projectNameEditor) : INotifyPropertyChanged, IAsyncDisposable
 {
     private readonly IShawzinStudioWorkflow _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
     private ProjectTimeline? _timeline;
@@ -71,6 +73,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     private string _validationCode = string.Empty;
     private string _validationReport = "Paste a Shawzin code to decode, validate and re-encode it.";
     private string _mappingSequence = string.Empty;
+    private string _projectNameDraft = VoidNote.Domain.Projects.ProjectName.Default;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public AudioLabViewModel AudioLab { get; } = audioLab;
@@ -88,7 +91,30 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     public string ApplicationVersion => typeof(MainWindowViewModel).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
     public VoidNoteProject Project => _project;
     public string ProjectName => _project.Metadata.Title;
+    public string ProjectNameDraft
+    {
+        get => _projectNameDraft;
+        set
+        {
+            if (!Set(ref _projectNameDraft, value)) return;
+            OnPropertyChanged(nameof(IsProjectNameEmpty));
+            OnPropertyChanged(nameof(IsProjectNameValid));
+        }
+    }
+    public int ProjectNameMaximumLength => VoidNote.Domain.Projects.ProjectName.MaximumLength;
+    public bool IsProjectNameEmpty => string.IsNullOrWhiteSpace(ProjectNameDraft);
+    public bool IsProjectNameValid => !IsProjectNameEmpty && ProjectNameDraft.Trim().Length <= VoidNote.Domain.Projects.ProjectName.MaximumLength;
     public string ProjectPath => _projectPath ?? "Not saved yet";
+    public string ProjectDialogDirectory => ProjectDialogDirectories.GetPreferredDirectory(_settings.Storage);
+    public string SuggestedProjectFileName
+    {
+        get
+        {
+            var invalid = Path.GetInvalidFileNameChars().ToHashSet();
+            var safeName = new string(ProjectName.Select(character => invalid.Contains(character) ? '_' : character).ToArray());
+            return safeName + ".vns";
+        }
+    }
     public bool IsDirty { get => _isDirty; private set { if (Set(ref _isDirty, value)) OnPropertyChanged(nameof(ProjectState)); } }
     public string ProjectState => IsDirty ? "Unsaved changes" : "Saved";
     public string ActiveJobs => jobs.Jobs.Count(value => value.State is BackgroundJobState.Queued or BackgroundJobState.Running) is var count && count > 0 ? $"{count} background job(s)" : "No background jobs";
@@ -171,6 +197,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         SelectedKeybindProfile = KeybindProfiles.FirstOrDefault();
         GameBridgeStatus = "DISARMED";
         AudioLab.ProjectChanged += AudioLabProjectChanged;
+        projectNameEditor.ProjectNameChanged += ProjectNameChanged;
         jobs.JobChanged += JobsChanged;
         RestartAutosaveLoop();
         OnPropertyChanged(nameof(GameBridgeAvailability)); OnPropertyChanged(nameof(DisclaimerAcknowledged)); OnPropertyChanged(nameof(SelectedCulture)); OnPropertyChanged(nameof(SelectedTheme)); OnPropertyChanged(nameof(SelectedAutosaveInterval));
@@ -182,10 +209,34 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         Status = "New project created.";
     }
 
+    public void RenameProject()
+    {
+        if (!IsProjectNameValid) return;
+        projectNameEditor.Rename(_project, ProjectNameDraft);
+        ProjectNameDraft = ProjectName;
+        NotifyHistoryState();
+    }
+
+    public void Undo()
+    {
+        if (history.Undo()) IsDirty = true;
+        NotifyHistoryState();
+    }
+
+    public void Redo()
+    {
+        if (history.Redo()) IsDirty = true;
+        NotifyHistoryState();
+    }
+
+    public bool CanUndo => history.CanUndo;
+    public bool CanRedo => history.CanRedo;
+
     public async Task OpenProjectAsync(string path, CancellationToken token = default)
     {
         var project = await projectStore.LoadAsync(path, token);
         SetProject(project, Path.GetFullPath(path), false);
+        RememberDialogDirectory(path);
         await RememberProjectAsync(token);
         Status = $"Opened project '{project.Metadata.Title}'.";
     }
@@ -205,6 +256,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
                 _openedRecovery = null;
             }
             _projectPath = savedPath;
+            RememberDialogDirectory(savedPath);
             IsDirty = false;
         }
         finally { _autosaveGate.Release(); }
@@ -451,9 +503,34 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
 
     private void SetProject(VoidNoteProject project, string? path, bool dirty)
     {
+        history.Clear();
         _project = project; _projectPath = path; _timeline = project.Timeline; Tracks = project.MidiTracks;
+        _projectNameDraft = project.Metadata.Title;
         SelectedTrack = Tracks.FirstOrDefault(); AudioLab.LoadProject(project); MandachordStudio.Prepare(project.Timeline, project.MidiTracks);
-        IsDirty = dirty; OnPropertyChanged(nameof(Project)); OnPropertyChanged(nameof(ProjectName)); OnPropertyChanged(nameof(ProjectPath)); OnPropertyChanged(nameof(Tracks));
+        IsDirty = dirty; OnPropertyChanged(nameof(Project)); OnPropertyChanged(nameof(ProjectName)); OnPropertyChanged(nameof(ProjectNameDraft));
+        OnPropertyChanged(nameof(IsProjectNameEmpty)); OnPropertyChanged(nameof(IsProjectNameValid)); OnPropertyChanged(nameof(ProjectPath)); OnPropertyChanged(nameof(Tracks));
+        NotifyHistoryState();
+    }
+
+    private void ProjectNameChanged(object? sender, EventArgs e)
+    {
+        _projectNameDraft = ProjectName;
+        IsDirty = true;
+        OnPropertyChanged(nameof(ProjectName)); OnPropertyChanged(nameof(ProjectNameDraft));
+        OnPropertyChanged(nameof(SuggestedProjectFileName));
+        OnPropertyChanged(nameof(IsProjectNameEmpty)); OnPropertyChanged(nameof(IsProjectNameValid));
+    }
+
+    private void RememberDialogDirectory(string projectPath)
+    {
+        _settings = _settings with { Storage = ProjectDialogDirectories.RememberProjectDirectory(_settings.Storage, projectPath) };
+        OnPropertyChanged(nameof(ProjectDialogDirectory));
+    }
+
+    private void NotifyHistoryState()
+    {
+        OnPropertyChanged(nameof(CanUndo));
+        OnPropertyChanged(nameof(CanRedo));
     }
 
     private async Task RememberProjectAsync(CancellationToken token)
@@ -526,7 +603,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
 
     public async ValueTask DisposeAsync()
     {
-        AudioLab.ProjectChanged -= AudioLabProjectChanged; jobs.JobChanged -= JobsChanged;
+        AudioLab.ProjectChanged -= AudioLabProjectChanged; projectNameEditor.ProjectNameChanged -= ProjectNameChanged; jobs.JobChanged -= JobsChanged;
         _autosaveCancellation?.Cancel();
         try { await _autosaveLoop; } catch (OperationCanceledException) { }
         _autosaveCancellation?.Dispose(); _autosaveGate.Dispose();

@@ -14,6 +14,28 @@ public sealed class VoidNoteProjectTests
         Assert.Equal(VoidNoteProject.CurrentFormatVersion, project.FormatVersion);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ProjectName_RejectsEmptyValues(string value)
+    {
+        Assert.Throws<ArgumentException>(() => ProjectName.Normalize(value));
+    }
+
+    [Fact]
+    public void ProjectName_EnforcesDocumentedMaximumLength()
+    {
+        Assert.Equal(120, ProjectName.MaximumLength);
+        Assert.Equal(new string('n', 120), ProjectName.Normalize(new string('n', 120)));
+        Assert.Throws<ArgumentException>(() => ProjectName.Normalize(new string('n', 121)));
+    }
+
+    [Fact]
+    public void ProjectName_DoesNotApplyFileSystemCharacterRestrictions()
+    {
+        Assert.Equal("Lead: Bass / Drums?", ProjectName.Normalize("Lead: Bass / Drums?"));
+    }
+
     [Fact]
     public void Validate_RejectsDuplicateItemIdsAcrossModules()
     {

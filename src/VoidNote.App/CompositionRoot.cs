@@ -56,6 +56,7 @@ internal static class CompositionRoot
         services.AddSingleton<IProjectStore, VnsProjectStore>();
         services.AddSingleton<IProjectRecoveryService, ProjectRecoveryService>();
         services.AddSingleton<IUndoRedoService, UndoRedoService>();
+        services.AddSingleton<ProjectNameEditService>();
         services.AddSingleton<IBackgroundJobManager, BackgroundJobManager>();
         services.AddSingleton<WaveAudioDecoder>();
         services.AddSingleton(serviceProvider => new FfmpegAudioDecoder(
