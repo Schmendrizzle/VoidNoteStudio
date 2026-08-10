@@ -23,6 +23,11 @@ using VoidNote.Shawzin.Codec;
 using VoidNote.Shawzin.Mapping;
 using VoidNote.Shawzin.Preview;
 using VoidNote.Shawzin.Ensemble;
+using VoidNote.Application.Jobs;
+using VoidNote.Audio.Decoding;
+using VoidNote.Audio.Import;
+using VoidNote.Audio.Playback;
+using VoidNote.Audio.Waveforms;
 
 namespace VoidNote.App;
 
@@ -31,12 +36,31 @@ internal static class CompositionRoot
     public static ServiceProvider BuildServiceProvider()
     {
         var paths = new AppPathProvider();
+        AppSettings startupSettings;
+        try { startupSettings = new JsonSettingsStore(paths).LoadAsync().GetAwaiter().GetResult(); }
+        catch (Exception exception) when (exception is IOException or InvalidDataException) { startupSettings = new AppSettings(); }
         var services = new ServiceCollection();
 
         services.AddSingleton<IAppPathProvider>(paths);
         services.AddSingleton<ISettingsStore, JsonSettingsStore>();
         services.AddSingleton<IProjectStore, VnsProjectStore>();
         services.AddSingleton<IUndoRedoService, UndoRedoService>();
+        services.AddSingleton<IBackgroundJobManager, BackgroundJobManager>();
+        services.AddSingleton<WaveAudioDecoder>();
+        services.AddSingleton(serviceProvider => new FfmpegAudioDecoder(
+            serviceProvider.GetRequiredService<ILogger<FfmpegAudioDecoder>>(),
+            startupSettings.Audio.FfmpegExecutablePath ?? "ffmpeg",
+            startupSettings.Audio.FfprobeExecutablePath ?? "ffprobe"));
+        services.AddSingleton<IAudioDecoder, PlatformAudioDecoder>();
+        services.AddSingleton<IAudioImportService, AudioImportService>();
+        services.AddSingleton<IWaveformCache>(_ => new FileWaveformCache(paths.WaveformCacheDirectory,
+            _.GetRequiredService<ILogger<FileWaveformCache>>()));
+        services.AddSingleton<IWaveformGenerator, WaveformGenerator>();
+        services.AddSingleton<IAudioPlaybackClock, SystemAudioPlaybackClock>();
+        services.AddSingleton<IAudioDeviceProvider>(serviceProvider => new PlatformAudioDeviceProvider(
+            serviceProvider.GetRequiredService<ILoggerFactory>(), startupSettings.Audio.FfplayExecutablePath ?? "ffplay"));
+        services.AddTransient<AudioPlaybackEngine>();
+        services.AddTransient<AudioLabViewModel>();
         services.AddSingleton<IMidiFileImporter, DryWetMidiFileImporter>();
         services.AddSingleton<IShawzinPitchMapper, ShawzinPitchMapper>();
         services.AddSingleton<IShawzinCompatibilityAnalyzer, ShawzinCompatibilityAnalyzer>();

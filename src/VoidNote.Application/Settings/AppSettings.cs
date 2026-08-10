@@ -18,6 +18,9 @@ public sealed record AppSettings
     /// <summary>Gets storage settings.</summary>
     public StorageSettings Storage { get; init; } = new();
 
+    /// <summary>Gets audio decoder, output and cache preferences.</summary>
+    public AudioSettings Audio { get; init; } = new();
+
     /// <summary>Gets local opt-in and timing preferences for the optional GameBridge.</summary>
     public GameBridgeSettings GameBridge { get; init; } = new();
 }
@@ -52,6 +55,13 @@ public sealed record StorageSettings
 {
     /// <summary>Gets the optional default project directory.</summary>
     public string? DefaultProjectDirectory { get; init; }
+}
+
+public sealed record AudioSettings
+{
+    public string? FfmpegExecutablePath { get; init; }
+    public string? FfprobeExecutablePath { get; init; }
+    public string? FfplayExecutablePath { get; init; }
 }
 
 /// <summary>Contains safe defaults for the optional external-input adapter.</summary>

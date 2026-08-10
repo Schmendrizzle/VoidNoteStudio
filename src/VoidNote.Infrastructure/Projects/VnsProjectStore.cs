@@ -35,6 +35,7 @@ public sealed class VnsProjectStore : IProjectStore
             var project = await JsonSerializer.DeserializeAsync<VoidNoteProject>(manifest, SerializerOptions, cancellationToken)
                 ?? throw new InvalidDataException("The project manifest contains no project object.");
             project.Validate();
+            await ExtractEmbeddedAudioAsync(project, archive, cancellationToken);
             return project;
         }
         catch (JsonException exception)
@@ -68,8 +69,20 @@ public sealed class VnsProjectStore : IProjectStore
             {
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
                 var entry = archive.CreateEntry(ManifestEntryName, CompressionLevel.Optimal);
-                await using var manifest = entry.Open();
-                await JsonSerializer.SerializeAsync(manifest, project, SerializerOptions, cancellationToken);
+                await using (var manifest = entry.Open())
+                {
+                    await JsonSerializer.SerializeAsync(manifest, project, SerializerOptions, cancellationToken);
+                    await manifest.FlushAsync(cancellationToken);
+                }
+                foreach (var source in project.AudioSources.Where(value => value.File?.Kind == ProjectPathKind.Embedded))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var sourcePath = source.ResolvedPath ?? source.SourcePath;
+                    if (!File.Exists(sourcePath)) throw new FileNotFoundException($"Embedded audio source '{source.Name}' is unavailable and the project was not overwritten.", sourcePath);
+                    var audioEntry = archive.CreateEntry(source.File!.Path, CompressionLevel.NoCompression);
+                    await using var input = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                    await using var output = audioEntry.Open(); await input.CopyToAsync(output, cancellationToken);
+                }
             }
 
             File.Move(temporaryPath, fullPath, overwrite: true);
@@ -86,6 +99,27 @@ public sealed class VnsProjectStore : IProjectStore
         if (!string.Equals(Path.GetExtension(path), ".vns", StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException("VoidNote project files must use the .vns extension.", nameof(path));
+        }
+    }
+
+    private static async Task ExtractEmbeddedAudioAsync(VoidNoteProject project, ZipArchive archive, CancellationToken token)
+    {
+        foreach (var source in project.AudioSources.Where(value => value.File?.Kind == ProjectPathKind.Embedded))
+        {
+            var entry = archive.GetEntry(source.File!.Path) ?? throw new InvalidDataException($"Embedded audio entry '{source.File.Path}' is missing.");
+            if (source.FileSize > 0 && entry.Length != source.FileSize) throw new InvalidDataException($"Embedded audio entry '{source.File.Path}' has an unexpected size.");
+            var directory = Path.Combine(Path.GetTempPath(), "VoidNoteStudio", "embedded", project.Id.ToString("N")); Directory.CreateDirectory(directory);
+            var extension = Path.GetExtension(source.File.Path); var target = Path.Combine(directory, source.Id.ToString("N") + extension); var temporary = target + ".tmp";
+            try
+            {
+                await using (var input = entry.Open())
+                await using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+                {
+                    await input.CopyToAsync(output, token); await output.FlushAsync(token);
+                }
+                File.Move(temporary, target, true); source.ResolvedPath = target;
+            }
+            finally { File.Delete(temporary); }
         }
     }
 }

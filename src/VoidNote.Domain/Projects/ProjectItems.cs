@@ -1,4 +1,6 @@
 using VoidNote.Domain.Music;
+using VoidNote.Domain.Audio;
+using System.Text.Json.Serialization;
 
 namespace VoidNote.Domain.Projects;
 
@@ -9,7 +11,7 @@ public abstract class ProjectItem
     public Guid Id { get; init; } = Guid.NewGuid();
 
     /// <summary>Gets or initializes the item name.</summary>
-    public string Name { get; init; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
 }
 
 /// <summary>Provides a file-backed project asset.</summary>
@@ -19,8 +21,19 @@ public abstract class ProjectAsset : ProjectItem
     public ProjectFileReference? File { get; init; }
 }
 
-/// <summary>Represents an audio source entry without implementing audio processing.</summary>
-public sealed class AudioSource : ProjectAsset;
+/// <summary>Represents an immutable source file used by one or more project tracks.</summary>
+public sealed class AudioSource : ProjectAsset
+{
+    public AudioFormatInfo Format { get; init; } = new()
+    {
+        Container = "unknown", Codec = "unknown", SampleRate = 1, ChannelCount = 1,
+        Duration = AbsoluteTime.Zero,
+    };
+    public string SourcePath { get; init; } = string.Empty;
+    public long FileSize { get; init; }
+    public DateTimeOffset LastWriteTimeUtc { get; init; }
+    [JsonIgnore] public string? ResolvedPath { get; set; }
+}
 
 /// <summary>Represents a separated stem entry without implementing separation.</summary>
 public sealed class Stem : ProjectAsset

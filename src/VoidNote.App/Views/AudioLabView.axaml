@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VoidNote.App.ViewModels"
+             xmlns:controls="using:VoidNote.App.Controls"
+             x:Class="VoidNote.App.Views.AudioLabView"
+             x:DataType="vm:AudioLabViewModel">
+  <Grid Margin="22" RowDefinitions="Auto,*,Auto" RowSpacing="14">
+    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
+      <Button Content="Import audio…" Click="ImportAudio_Click" />
+      <Button Grid.Column="1" Content="Zoom −" Click="ZoomOut_Click" />
+      <Button Grid.Column="2" Content="Zoom +" Click="ZoomIn_Click" />
+      <Button Grid.Column="3" Content="Clear waveform cache" Click="ClearCache_Click" />
+      <ProgressBar Grid.Column="4" Minimum="0" Maximum="1" Value="{Binding Progress}" VerticalAlignment="Center" />
+      <Button Grid.Column="5" Content="Cancel job" Click="Cancel_Click" />
+    </Grid>
+    <Grid Grid.Row="1" ColumnDefinitions="300,*" ColumnSpacing="14">
+      <ListBox ItemsSource="{Binding Tracks}" SelectedItem="{Binding SelectedTrack}">
+        <ListBox.ItemTemplate><DataTemplate x:DataType="vm:AudioTrackRowViewModel">
+          <Border Padding="10" Margin="0,3" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+            <StackPanel Spacing="6">
+              <TextBox Text="{Binding Name}" />
+              <TextBlock Text="{Binding Details}" TextWrapping="Wrap" Opacity="0.75" />
+              <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
+                <TextBlock Text="Gain" VerticalAlignment="Center" />
+                <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2" Increment="0.05" Value="{Binding Gain}" />
+                <CheckBox Grid.Column="2" Content="Mute" IsChecked="{Binding IsMuted}" />
+                <CheckBox Grid.Column="3" Content="Solo" IsChecked="{Binding IsSolo}" />
+              </Grid>
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                <TextBlock Text="Start (s)" VerticalAlignment="Center" />
+                <NumericUpDown Grid.Column="1" Minimum="0" Value="{Binding StartSeconds}" />
+                <CheckBox Grid.Column="2" Content="Active" IsChecked="{Binding IsEnabled}" />
+              </Grid>
+              <Button Content="Remove (Undo/Redo)" Click="RemoveTrack_Click" />
+            </StackPanel>
+          </Border>
+        </DataTemplate></ListBox.ItemTemplate>
+      </ListBox>
+      <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="8">
+        <TextBlock Text="{Binding DeviceCapability}" TextWrapping="Wrap" Opacity="0.75" />
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+          <controls:WaveformControl Width="{Binding WaveformWidth}" Height="300" Data="{Binding Waveform}"
+             PlayheadSeconds="{Binding PlayheadSeconds}" SelectionStartSeconds="{Binding SelectionStartSeconds}"
+             SelectionEndSeconds="{Binding SelectionEndSeconds}" />
+        </ScrollViewer>
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
+          <Button Content="Play" Click="Play_Click" /><Button Grid.Column="1" Content="Pause" Click="Pause_Click" />
+          <Button Grid.Column="2" Content="Stop" Click="Stop_Click" /><Button Grid.Column="3" Content="Seek" Click="Seek_Click" />
+          <Slider Grid.Column="4" Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding PlayheadSeconds}" />
+          <CheckBox Grid.Column="5" Content="Loop selection" IsChecked="{Binding LoopEnabled}" />
+        </Grid>
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8">
+          <TextBlock Text="Selection start" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding SelectionStartSeconds}" />
+          <TextBlock Grid.Column="2" Text="End" VerticalAlignment="Center" /><NumericUpDown Grid.Column="3" Minimum="0" Maximum="{Binding DurationSeconds}" Value="{Binding SelectionEndSeconds}" />
+        </Grid>
+      </Grid>
+    </Grid>
+    <TextBlock Grid.Row="2" Text="{Binding Status}" TextWrapping="Wrap" />
+  </Grid>
+</UserControl>

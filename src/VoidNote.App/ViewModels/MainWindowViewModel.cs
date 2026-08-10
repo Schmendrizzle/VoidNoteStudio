@@ -17,7 +17,8 @@ namespace VoidNote.App.ViewModels;
 /// <summary>Presentation state for the minimal Milestone-D Shawzin Studio.</summary>
 public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiShawzinWorkflow multiWorkflow,
     IShawzinEnsembleArranger ensembleArranger, GameBridgePlaybackSession gameBridge,
-    KeybindProfileService profileService, ISettingsStore settingsStore, ILogger<MainWindowViewModel> logger) : INotifyPropertyChanged
+    KeybindProfileService profileService, ISettingsStore settingsStore, ILogger<MainWindowViewModel> logger,
+    AudioLabViewModel audioLab) : INotifyPropertyChanged
 {
     private readonly IShawzinStudioWorkflow _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
     private ProjectTimeline? _timeline;
@@ -50,6 +51,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     private ShawzinEnsemble? _ensemble;
 
     public event PropertyChangedEventHandler? PropertyChanged;
+    public AudioLabViewModel AudioLab { get; } = audioLab;
     public IReadOnlyList<MidiTrack> Tracks { get; private set; } = [];
     public IReadOnlyList<ShawzinDefinition> Instruments => BuiltInShawzinDefinitions.All;
     public IReadOnlyList<ShawzinScale> Scales { get; } = Enum.GetValues<ShawzinScale>();

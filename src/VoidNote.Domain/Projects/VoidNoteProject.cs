@@ -1,5 +1,6 @@
 using VoidNote.Domain.Music;
 using VoidNote.Domain.Shawzin;
+using VoidNote.Domain.Audio;
 
 namespace VoidNote.Domain.Projects;
 
@@ -23,6 +24,12 @@ public sealed class VoidNoteProject
 
     /// <summary>Gets or initializes source audio references.</summary>
     public List<AudioSource> AudioSources { get; init; } = [];
+
+    /// <summary>Gets or initializes audio tracks placed on the master timeline.</summary>
+    public List<AudioTrack> AudioTracks { get; init; } = [];
+
+    /// <summary>Gets or initializes non-destructive timeline selections.</summary>
+    public List<AudioRegion> AudioRegions { get; init; } = [];
 
     /// <summary>Gets or initializes separated-stem references.</summary>
     public List<Stem> Stems { get; init; } = [];
@@ -58,6 +65,9 @@ public sealed class VoidNoteProject
         }
 
         var ids = AudioSources.Cast<ProjectItem>()
+            .Concat(AudioTracks)
+            .Concat(AudioTracks.SelectMany(track => track.Clips))
+            .Concat(AudioRegions)
             .Concat(Stems)
             .Concat(MidiTracks)
             .Concat(ShawzinTracks)
@@ -70,5 +80,17 @@ public sealed class VoidNoteProject
         {
             throw new InvalidOperationException("Project item IDs must be non-empty and unique.");
         }
+
+        foreach (var source in AudioSources)
+        {
+            if (source.File is null || source.Format.SampleRate <= 0 || source.Format.ChannelCount <= 0)
+                throw new InvalidOperationException("Audio sources require a file reference and valid format information.");
+        }
+
+        var sourceIds = AudioSources.Select(source => source.Id).ToHashSet();
+        if (AudioTracks.SelectMany(track => track.Clips).Any(clip => !sourceIds.Contains(clip.SourceId)))
+            throw new InvalidOperationException("Every audio clip must reference a project audio source.");
+
+        foreach (var region in AudioRegions) region.Validate();
     }
 }

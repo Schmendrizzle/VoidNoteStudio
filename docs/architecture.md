@@ -1,8 +1,8 @@
-# VoidNote Studio – Architekturstand Milestone F
+# VoidNote Studio – Architekturstand Milestone G
 
 ## Geltungsbereich
 
-Dieses Dokument beschreibt die implementierte Architektur nach **Milestone F – Multi-Shawzin**. Foundation, MIDI Core, Shawzin Codec, Composer/Arranger, die optionale gekapselte Ingame-Wiedergabe und Multi-Shawzin-Ensembles sind enthalten. Audio Lab, Mandachord und der spätere Take Manager bleiben späteren Milestones vorbehalten.
+Dieses Dokument beschreibt die implementierte Architektur nach **Milestone G – Audio Lab Core**. Foundation, MIDI Core, Shawzin Codec, Composer/Arranger, die optionale gekapselte Ingame-Wiedergabe, Multi-Shawzin-Ensembles und die grundlegende Audio-Infrastruktur sind enthalten. Stem Separation, Audio-to-MIDI, Mandachord und der spätere Take Manager bleiben späteren Milestones vorbehalten.
 
 ## Technische Basis
 
@@ -12,6 +12,7 @@ Dieses Dokument beschreibt die implementierte Architektur nach **Milestone F –
 - Microsoft Extensions für Dependency Injection und Logging
 - xUnit für Domain-, Modul- und Integrationstests
 - DryWetMIDI 8.0.3 als stabile, MIT-lizenzierte SMF-Implementierung, ausschließlich in `VoidNote.Midi`
+- eingebauter RIFF/WAV-Streamingdecoder sowie optionaler FFmpeg-/ffprobe-/ffplay-Prozessadapter, Referenzversion 8.1.2
 - zentrale Paketversionen in `Directory.Packages.props`
 
 ## Projekte und Verantwortlichkeiten
@@ -23,7 +24,7 @@ Dieses Dokument beschreibt die implementierte Architektur nach **Milestone F –
 | `VoidNote.Infrastructure` | JSON-Settings, ZIP-basiertes `.vns`-Format, lokale JSON-Logs, Anwendungspfade | Application, Domain |
 | `VoidNote.App` | Avalonia-Host, Composition Root, DI-Registrierung, MVVM-Shell | Application, Infrastructure |
 | `VoidNote.Midi` | Gekapselter SMF-Import/-Export, Playback-Scheduler und Geräteverträge | Domain, DryWetMIDI |
-| `VoidNote.Audio` | reservierte Modulgrenze; keine Audiofunktion implementiert | keine |
+| `VoidNote.Audio` | Decoderports, WAV-/FFmpeg-Adapter, Audioimport, Waveform-Pyramide/-Cache, Playback und Geräteports | Domain, Microsoft.Extensions.Logging |
 | `VoidNote.Shawzin` | Codec, Mapping, Analyse, Arrangement, Preview sowie UI-unabhängige Multi-Shawzin-Trennung und Ensemble-Wiedergabe | Domain |
 | `VoidNote.Mandachord` | reservierte Modulgrenze; keine Arrangementlogik implementiert | keine |
 | `VoidNote.GameBridge` | Portable Input-Ports, Keybind-Profile, Mapping, Arm/Disarm, Diagnostik sowie getrennte Windows-/Linux-Adapter | Application, Domain, Shawzin |
@@ -43,6 +44,10 @@ VoidNote.Midi ───────────────────> VoidNot
 VoidNote.Shawzin ────────────────> VoidNote.Domain
       └── keine externe Codec-Dependency
 
+VoidNote.Audio ─────────────────> VoidNote.Domain
+      ├── eingebaut: RIFF/WAV PCM/Float
+      └── optionaler Prozessadapter: FFmpeg/ffprobe/ffplay 8.1.2+
+
 VoidNote.Domain ─────────────────> keine externen, UI- oder MIDI-Library-Abhängigkeiten
 ```
 
@@ -51,6 +56,8 @@ VoidNote.Domain ─────────────────> keine exter
 ## Zentrales Projekt- und Zeitmodell
 
 `VoidNoteProject` bleibt die versionierte Wurzel des normalisierten Modells (`formatVersion = 1`). `MidiTrack` enthält `MusicalEvent`-Noten mit stabiler ID, Starttick, Dauer, Pitch, Velocity, Herkunft und Confidence.
+
+`AudioSource` beschreibt immutable Quelldateien mit expliziter eingebetteter, relativer oder absoluter Referenz und formatunabhängigen Metadaten. `AudioTrack` enthält nicht-destruktive `AudioClip`-Platzierungen; deren `MusicalTime`-Start liegt auf derselben `ProjectTimeline` wie MIDI und Shawzin. Gain, Mute, Solo, Active, Trim-In und Dauer verändern die Originaldatei nicht. `AudioRegion` speichert Auswahl und Loop in präziser `AbsoluteTime`.
 
 `ShawzinTrack` bleibt ein `ProjectTrack` und ergänzt dessen normalisierte Eventgrenze um die code-relevante Skala sowie geordnete physische `ShawzinEvent`-Anschläge. Diese enthalten stabile IDs, präzise absolute Positionen sowie `ShawzinNote`/`ShawzinChord` aus Saiten- und Fretwerten. Dadurch bleibt das Codeformat frei von MIDI-Pitches und kann dennoch über `ProjectTimeline` verlustarm auf die gemeinsame Timeline projiziert werden. Eine musikalische Pitch-Zuordnung hängt zusätzlich von Instrument und Tuning ab und wird bewusst erst im Arranger-Milestone implementiert.
 
@@ -91,6 +98,14 @@ Der Codec bleibt von MIDI-Zuordnung, Skalenwahl, Compatibility-Bewertung und Wie
 
 `IMidiDeviceProvider`, `IMidiInputDevice` und `IMidiOutputDevice` definieren die Erweiterungsgrenze für spätere Plattformadapter und Recording. Milestone B enthält bewusst keine konkrete native Geräteimplementierung und keinen vollständigen Recorder.
 
+`AudioPlaybackEngine` dekodiert ausgewählte Audio-Clips streambasiert gegen einen einzigen monotonic-clock-Anker. Startoffset, Seek, Pause/Resume, Stop/Restart, Gain, Mute und Solo werden auf die Master-Timeline bezogen. `IAudioOutputDevice` und `IAudioDeviceProvider` kapseln die Ausgabe. Das erste optionale Windows-/Linux-Backend streamt Float-PCM an `ffplay`; ein `DiagnosticAudioOutputDevice` erlaubt vollständig gerätelose Tests. FFplay kann in dieser ersten Integration nur das System-Defaultgerät verwenden und meldet fehlende Geräteenumeration als Capability.
+
+## Audio Lab Core
+
+`PlatformAudioDecoder` verwendet für PCM-/Float-WAV den eingebauten `WaveAudioDecoder` und für MP3/FLAC den optionalen `FfmpegAudioDecoder`. `IAudioImportService` führt Validierung, Probe, Domain-Erzeugung und Projekteingliederung mit Cancellation und Progress aus. Fehlendes FFmpeg schränkt nur MP3/FLAC ein und verhindert weder Programmstart noch WAV-Verarbeitung.
+
+`WaveformGenerator` verarbeitet begrenzte PCM-Blöcke zu 256-Frame-Min/Max-Peaks und baut daraus gröbere Zweier-Stufen. `FileWaveformCache` speichert die versionierte Pyramide lokal; der Schlüssel enthält Pfad, Dateigröße, Änderungszeit, Decoder-ID, Codec, Sample Rate, Kanäle und Bit Depth. Beschädigte oder veraltete Daten werden nicht verwendet. Details stehen in `docs/audio.md`.
+
 ## Piano Roll
 
 `PianoRollViewModel` in Application ist eine schreibgeschützte, Avalonia-unabhängige Projektion eines normalisierten MIDI-Tracks. Sie stellt Ticks, Beats, musikalische und absolute Positionen für eine spätere Oberfläche bereit. Editierwerkzeuge, Quantisierung und aufwendige Darstellung sind noch nicht implementiert.
@@ -111,7 +126,7 @@ Die Bridge ist standardmäßig disarmed. Profilvalidierung, Fokusprüfung und Ca
 
 ## Persistenz und Foundation-Dienste
 
-Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `project.json`; Settings und Projekte werden atomar geschrieben; Logging bleibt lokal und ohne Telemetrie; Undo/Redo bleibt UI-unabhängig. Ältere Version-1-Projekte ohne Taktarten-Map erhalten beim Laden die Default-Taktart 4/4.
+Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `project.json`; eingebettete Audioquellen liegen unverändert unter `audio/`, externe Referenzen bleiben explizit relativ oder absolut. Settings und Projekte werden atomar geschrieben; Logging bleibt lokal und ohne Telemetrie; Undo/Redo bleibt UI-unabhängig. Ältere Version-1-Projekte ohne Audiofelder oder Taktarten-Map bleiben ladbar und erhalten leere Audio-Collections beziehungsweise die Default-Taktart 4/4.
 
 ## Bewusst offene Punkte nach Milestone F
 
@@ -130,5 +145,7 @@ Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `p
 - Wayland wird für reale Eingabesimulation bewusst als nicht verfügbar gemeldet.
 - Die Voice-Separation ist bewusst heuristisch und deterministisch; sie ist keine musikwissenschaftlich perfekte Stimmführungsanalyse.
 - Die minimale Multi-Shawzin-UI ist keine Piano-Roll und bietet noch keine grafische Drag-and-drop-Zuordnung; die zugrunde liegenden Reassignment-Operationen sind vorhanden.
-- Ensemble-Preview wird als synthetischer Stereo-WAV-Mix gerendert; ein plattformübergreifender Live-Audio-Ausgang bleibt offen.
+- FFmpeg/ffprobe/ffplay werden nicht gebündelt. Ohne die optionale Installation bleiben WAV-Import, Waveforms für WAV und alle nicht-Audio-Module nutzbar; MP3/FLAC und Live-Ausgabe melden ihre fehlende Capability.
+- FFplay verwendet in Milestone G das System-Defaultgerät; native Geräteauswahl und Enumeration sind noch nicht implementiert.
+- Audio-Synchronisation verwendet einen monotonic-clock-Anker und vermeidet kumulative Schedulerdrift, verspricht aber noch keine sample-genaue DAW- oder Hardware-Clock-Synchronisation.
 - GameBridge bleibt unverändert auf einen ausgewählten, bereits arrangierten Ensemble-Track begrenzt.

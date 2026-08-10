@@ -22,12 +22,17 @@ public sealed class App(IServiceProvider services) : Avalonia.Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            var viewModel = _services.GetRequiredService<MainWindowViewModel>();
             desktop.MainWindow = new MainWindow
             {
-                DataContext = _services.GetRequiredService<MainWindowViewModel>(),
+                DataContext = viewModel,
             };
-            desktop.Exit += (_, _) => _services.GetRequiredService<GameBridgePlaybackSession>().StopAsync().GetAwaiter().GetResult();
-            _services.GetRequiredService<ILogger<App>>().LogInformation("VoidNote Studio foundation started.");
+            desktop.Exit += (_, _) =>
+            {
+                viewModel.AudioLab.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                _services.GetRequiredService<GameBridgePlaybackSession>().StopAsync().GetAwaiter().GetResult();
+            };
+            _services.GetRequiredService<ILogger<App>>().LogInformation("VoidNote Studio Milestone G started.");
         }
 
         base.OnFrameworkInitializationCompleted();

@@ -7,6 +7,8 @@ public enum ProjectPathKind
     Relative,
     /// <summary>The path points to an external absolute location.</summary>
     Absolute,
+    /// <summary>The path identifies an entry embedded in the project container.</summary>
+    Embedded,
 }
 
 /// <summary>Represents an explicit relative or absolute project file reference.</summary>
@@ -17,9 +19,9 @@ public sealed record ProjectFileReference
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var isRooted = System.IO.Path.IsPathRooted(path);
-        if (kind == ProjectPathKind.Relative && isRooted)
+        if ((kind == ProjectPathKind.Relative || kind == ProjectPathKind.Embedded) && isRooted)
         {
-            throw new ArgumentException("A relative project path cannot be rooted.", nameof(path));
+            throw new ArgumentException("A relative or embedded project path cannot be rooted.", nameof(path));
         }
 
         if (kind == ProjectPathKind.Absolute && !isRooted)

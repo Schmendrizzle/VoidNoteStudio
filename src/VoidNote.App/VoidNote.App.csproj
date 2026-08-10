@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\VoidNote.Application\VoidNote.Application.csproj" />
+    <ProjectReference Include="..\VoidNote.Audio\VoidNote.Audio.csproj" />
     <ProjectReference Include="..\VoidNote.Domain\VoidNote.Domain.csproj" />
     <ProjectReference Include="..\VoidNote.Infrastructure\VoidNote.Infrastructure.csproj" />
     <ProjectReference Include="..\VoidNote.GameBridge\VoidNote.GameBridge.csproj" />

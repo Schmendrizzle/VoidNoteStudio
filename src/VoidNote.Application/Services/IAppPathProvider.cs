@@ -11,4 +11,7 @@ public interface IAppPathProvider
 
     /// <summary>Gets the local log directory.</summary>
     string LogDirectory { get; }
+
+    /// <summary>Gets the local, user-clearable waveform cache directory.</summary>
+    string WaveformCacheDirectory { get; }
 }

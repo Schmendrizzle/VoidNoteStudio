@@ -28,4 +28,7 @@ public sealed class AppPathProvider : IAppPathProvider
 
     /// <inheritdoc />
     public string LogDirectory => Path.Combine(_rootDirectory, "logs");
+
+    /// <inheritdoc />
+    public string WaveformCacheDirectory => Path.Combine(_rootDirectory, "cache", "waveforms");
 }
