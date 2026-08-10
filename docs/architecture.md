@@ -1,34 +1,33 @@
-# VoidNote Studio – Architekturstand Milestone A
+# VoidNote Studio – Architekturstand Milestone B
 
 ## Geltungsbereich
 
-Dieses Dokument beschreibt die tatsächlich implementierte Architektur nach **Milestone A – Foundation**. Der Stand enthält bewusst keine Funktionslogik für MIDI, Audio, Shawzin, Mandachord, GameBridge oder Creator Mode. Die entsprechenden Projekte sind ausschließlich unabhängige Modulgrenzen für spätere Milestones.
+Dieses Dokument beschreibt die implementierte Architektur nach **Milestone B – MIDI Core**. MIDI-Import, -Export, Zeitkonvertierung, Playback-Grundlage, Geräteports und eine minimale Piano-Roll-Projektion sind enthalten. Shawzin, Mandachord, Audio-to-MIDI, vollständiges Recording, GameBridge und eine grafische DAW-Oberfläche bleiben ausdrücklich späteren Milestones vorbehalten.
 
 ## Technische Basis
 
 - .NET 10 LTS, zentral in `Directory.Build.props` und `global.json` festgelegt
-- C# 14 mit aktivierten Nullable Reference Types
+- C# 14 mit aktivierten Nullable Reference Types und Warnungen als Fehler
 - Avalonia 12.1 für die gemeinsame Windows-/Linux-Desktopanwendung
 - Microsoft Extensions für Dependency Injection und Logging
-- xUnit für Foundation- und Integrationstests
+- xUnit für Domain-, Modul- und Integrationstests
+- DryWetMIDI 8.0.3 als stabile, MIT-lizenzierte SMF-Implementierung, ausschließlich in `VoidNote.Midi`
 - zentrale Paketversionen in `Directory.Packages.props`
 
 ## Projekte und Verantwortlichkeiten
 
-| Projekt | Verantwortung in Milestone A | Direkte Projektabhängigkeiten |
+| Projekt | Verantwortung | Direkte Projektabhängigkeiten |
 | --- | --- | --- |
-| `VoidNote.Domain` | Normalisiertes Projekt- und Musikmodell, Master-Timeline, Domain-Invarianten | keine |
-| `VoidNote.Application` | Ports für Settings und Projektpersistenz, UI-unabhängige Undo/Redo-Steuerung | Domain |
+| `VoidNote.Domain` | Normalisiertes Projekt- und Musikmodell, Master-Timeline, Tempo- und Taktarten-Map, Domain-Invarianten | keine |
+| `VoidNote.Application` | Ports für Settings und Projektpersistenz, Undo/Redo sowie UI-unabhängige Piano-Roll-Projektion | Domain |
 | `VoidNote.Infrastructure` | JSON-Settings, ZIP-basiertes `.vns`-Format, lokale JSON-Logs, Anwendungspfade | Application, Domain |
 | `VoidNote.App` | Avalonia-Host, Composition Root, DI-Registrierung, MVVM-Shell | Application, Infrastructure |
+| `VoidNote.Midi` | Gekapselter SMF-Import/-Export, Playback-Scheduler und Geräteverträge | Domain, DryWetMIDI |
 | `VoidNote.Audio` | reservierte Modulgrenze; keine Audiofunktion implementiert | keine |
-| `VoidNote.Midi` | reservierte Modulgrenze; kein MIDI-Import/-Export implementiert | keine |
 | `VoidNote.Shawzin` | reservierte Modulgrenze; kein Codec oder Playback implementiert | keine |
 | `VoidNote.Mandachord` | reservierte Modulgrenze; keine Arrangementlogik implementiert | keine |
 | `VoidNote.GameBridge` | reservierte Modulgrenze; keine Eingabesimulation implementiert | keine |
 | `VoidNote.PluginContracts` | reservierte Assembly-Grenze; kein öffentliches Plugin-System implementiert | keine |
-
-Die sechs im Pflichtenheft vorgesehenen Testprojekte wurden angelegt. `VoidNote.Domain.Tests` prüft die Foundation-Domainlogik. `VoidNote.IntegrationTests` prüft Application- und Infrastructure-Zusammenspiel. Die übrigen modulspezifischen Testprojekte bleiben bis zum jeweiligen Milestone ohne Featuretests.
 
 ## Abhängigkeitsrichtung
 
@@ -38,45 +37,53 @@ VoidNote.App
     └──> VoidNote.Infrastructure ─> VoidNote.Application
                                 └─> VoidNote.Domain
 
-spätere Featuremodule ───> derzeit keine Abhängigkeiten
-VoidNote.Domain ─────────> keine externen oder UI-/Plattformabhängigkeiten
+VoidNote.Midi ───────────────────> VoidNote.Domain
+      └── intern: DryWetMIDI 8.0.3
+
+VoidNote.Domain ─────────────────> keine externen, UI- oder MIDI-Library-Abhängigkeiten
 ```
 
-Die UI kennt konkrete Infrastructure-Typen nur im Composition Root. Views enthalten ausschließlich Darstellung. ViewModels und Application-Services enthalten keine Avalonia-Typen. Betriebssystemnahe Pfadermittlung und Dateizugriffe liegen in Infrastructure.
+Öffentliche MIDI-Schnittstellen verwenden ausschließlich BCL- und VoidNote-Typen. Weder Domain noch Application oder UI sehen DryWetMIDI-Typen. Architekturtests prüfen diese Grenze automatisch.
 
-## Zentrales Projektmodell
+## Zentrales Projekt- und Zeitmodell
 
-`VoidNoteProject` ist die versionierte Wurzel des normalisierten Modells (`formatVersion = 1`). Es enthält Metadaten, eine gemeinsame Timeline sowie typisierte Sammlungen für Audioquellen, Stems, MIDI-, Shawzin- und Mandachord-Spuren und Creator-Sessions. Diese Typen stellen nur die gemeinsame erweiterbare Datenbasis dar; sie implementieren keine späteren Workflows.
+`VoidNoteProject` bleibt die versionierte Wurzel des normalisierten Modells (`formatVersion = 1`). `MidiTrack` enthält `MusicalEvent`-Noten mit stabiler ID, Starttick, Dauer, Pitch, Velocity, Herkunft und Confidence.
 
-`ProjectTimeline` verwendet ganzzahlige Ticks mit projektweiter Auflösung und eine geordnete Tempomap. Konvertierungen zu `AbsoluteTime` rechnen mit Dezimalsekunden und berücksichtigen Tempoänderungen. Gerundete Millisekunden sind nicht die primäre Speicherung.
+`ProjectTimeline` speichert ganzzahlige Ticks mit projektweiter PPQ-Auflösung. Sie enthält geordnete `TempoChange`- und `TimeSignatureChange`-Maps und konvertiert zwischen:
 
-Musikalische Events tragen stabile IDs, Start, Dauer, Pitch, Velocity, Herkunft und Confidence. Die Herkunft bleibt dadurch über spätere automatische und manuelle Transformationen nachvollziehbar.
+- MIDI-Ticks und Viertelnoten-Beats
+- MIDI-Ticks und nullbasierte, bei Bedarf gebrochene Taktkoordinaten
+- MIDI-Ticks und `MusicalPosition` (Takt, Taktbeat, Tick im Beat)
+- MIDI-Ticks und hochpräziser `AbsoluteTime` in Dezimalsekunden
 
-## Persistenz und Datenintegrität
+Tempoänderungen werden segmentweise integriert. Millisekunden sind weder primäre Speicherung noch Konvertierungsbasis. Taktartenwechsel beginnen definitionsgemäß einen neuen Takt; dadurch bleiben auch nicht taktgrenzengenaue SMF-Wechsel eindeutig vorwärts abbildbar.
 
-- `.vns` ist ein ZIP-Container mit `project.json` als versioniertem Manifest.
-- Speichervorgänge schreiben zuerst eine temporäre Datei und ersetzen das Ziel erst nach erfolgreicher Serialisierung.
-- Settings liegen versioniert als lokales JSON vor und werden ebenfalls atomar ersetzt.
-- Relative und absolute Projektpfade werden im Domain-Modell ausdrücklich unterschieden.
-- Migration, Autosave und Crash Recovery sind noch nicht implementiert; unbekannte Format- oder Settings-Versionen werden abgelehnt.
+## MIDI-Modul
 
-## Logging
+`IMidiFileImporter` und `IMidiFileExporter` bilden die stabilen Modulgrenzen. `DryWetMidiFileImporter` und `DryWetMidiFileExporter` sind die derzeitigen Adapter. Details zu Pipeline, Rundung und Einschränkungen stehen in `docs/midi.md`.
 
-Die Anwendung nutzt `Microsoft.Extensions.Logging`. Der Composition Root registriert Konsolenlogging und einen lokalen JSON-Lines-Provider mit den standardisierten Logstufen Trace bis Critical. Es gibt keine Telemetrie und keinen Netzwerktransport. Die Logdateien werden unter dem vom Betriebssystem gelieferten lokalen Anwendungsdatenpfad gespeichert.
+Der Import normalisiert PPQ, Tempo, Taktarten, Tracknamen und Noten. Der Standardexport erzeugt eine Format-1-Datei mit eigener Conductor-Spur und einer Spur je geeignetem VoidNote-MIDI-Track.
 
-## Undo/Redo
+## Playback und Geräte
 
-`IUndoableCommand` und `IUndoRedoService` bilden eine UI-unabhängige lineare Command-Historie. Neue Befehle löschen den Redo-Zweig. Ein Befehl wird erst nach erfolgreicher Ausführung beziehungsweise Rücknahme zwischen den Stacks verschoben, sodass fehlgeschlagene Operationen die Historie nicht verfälschen.
+`MidiPlaybackEngine` erzeugt aus der gemeinsamen Timeline absolute Note-On-/Note-Off-Zielzeiten. `IPlaybackScheduler` arbeitet gegen einen festen monotonic-clock-Anker; Wartefehler werden daher nicht von Event zu Event aufsummiert. Der Transport bietet Play, Pause, Stop, Seek und Cancellation. `IMidiPlaybackOutput` hält die Ausgabe austauschbar.
 
-## Dependency Injection
+`IMidiDeviceProvider`, `IMidiInputDevice` und `IMidiOutputDevice` definieren die Erweiterungsgrenze für spätere Plattformadapter und Recording. Milestone B enthält bewusst keine konkrete native Geräteimplementierung und keinen vollständigen Recorder.
 
-`CompositionRoot` in `VoidNote.App` ist der einzige Ort, an dem konkrete Infrastructure-Implementierungen den Application-Interfaces zugeordnet werden. Registriert sind Settings, Projektpersistenz, Undo/Redo, Pfade, Logging und die initiale ViewModel-Erzeugung.
+## Piano Roll
 
-## Bewusst offene Punkte nach Milestone A
+`PianoRollViewModel` in Application ist eine schreibgeschützte, Avalonia-unabhängige Projektion eines normalisierten MIDI-Tracks. Sie stellt Ticks, Beats, musikalische und absolute Positionen für eine spätere Oberfläche bereit. Editierwerkzeuge, Quantisierung und aufwendige Darstellung sind noch nicht implementiert.
 
-- Noch keine Migration älterer `.vns`-Versionen; Version 1 ist das einzige unterstützte Format.
-- Noch keine Autosave-/Recovery-Strategie.
-- Noch keine Lokalisierungsinfrastruktur; sichtbare Texte liegen jedoch bereits in XAML-Ressourcen und nicht im C#-Code.
-- Linux wird über Avalonia Desktop und plattformneutrale .NET-APIs unterstützt; eine native Linux-Ausführung ist Bestandteil der künftigen CI-/Releaseumgebung.
-- Die CI-Matrix baut und testet die Solution auf Windows und Ubuntu; die lokale Abschlussprüfung dieses Milestones erfolgte auf Windows.
-- Die reservierten Featureassemblies enthalten absichtlich noch keine fachlichen Schnittstellen oder Implementierungen, da diese erst mit ihrem jeweiligen Milestone konkretisiert werden.
+## Persistenz und Foundation-Dienste
+
+Die Milestone-A-Architektur bleibt bestehen: `.vns` ist ein ZIP-Container mit `project.json`; Settings und Projekte werden atomar geschrieben; Logging bleibt lokal und ohne Telemetrie; Undo/Redo bleibt UI-unabhängig. Ältere Version-1-Projekte ohne Taktarten-Map erhalten beim Laden die Default-Taktart 4/4.
+
+## Bewusst offene Punkte nach Milestone B
+
+- MIDI-Kanäle, Program Changes, Controller, Marker und SysEx sind noch nicht Teil des normalisierten Domain-Modells.
+- SMPTE-Time-Division wird abgelehnt; der MIDI Core verwendet PPQ.
+- Leere SMF-/Conductor-Spuren werden nicht als Domain-Track angelegt; globale Tempo- und Taktartdaten werden separat übernommen.
+- Seek reartikuliert keine bereits vor der Zielposition gestartete, noch klingende Note.
+- Noch keine native MIDI-Geräteimplementierung und kein vollständiges Recording.
+- Noch keine Piano-Roll-GUI, Editieroperationen oder Quantisierung.
+- Migration, Autosave und Crash Recovery bleiben spätere Foundation-Erweiterungen.
