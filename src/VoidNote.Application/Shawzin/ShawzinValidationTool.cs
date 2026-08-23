@@ -1,7 +1,6 @@
 using VoidNote.Domain.Music;
 using VoidNote.Domain.Shawzin;
 using VoidNote.Shawzin.Codec;
-using VoidNote.Shawzin.Mapping;
 
 namespace VoidNote.Application.Shawzin;
 
@@ -25,6 +24,21 @@ public sealed record ShawzinMappingValidationRecord(
     bool UserConfirmed,
     string Notes);
 
+public sealed record ShawzinValidationPosition(
+    int Index,
+    int Pitch,
+    string NoteName,
+    ShawzinString String,
+    ShawzinFret Fret,
+    char CodeSymbol);
+
+public sealed record ShawzinMappingValidationSequence(
+    string InstrumentProfile,
+    ShawzinScale Scale,
+    IReadOnlyList<ShawzinValidationPosition> Positions,
+    string Description,
+    string SongCode);
+
 public interface IShawzinValidationRecordStore
 {
     Task<IReadOnlyList<ShawzinMappingValidationRecord>> LoadAsync(CancellationToken cancellationToken = default);
@@ -35,6 +49,7 @@ public interface IShawzinValidationTool
 {
     ShawzinCodeValidationReport Validate(string code, ShawzinDefinition instrument);
     string CreateMappingTestSequence(ShawzinDefinition instrument, ShawzinScale scale);
+    ShawzinMappingValidationSequence CreateMappingValidation(ShawzinDefinition instrument, ShawzinScale scale);
 }
 
 public sealed class ShawzinValidationTool(IShawzinCodeDecoder decoder, IShawzinCodeEncoder encoder, IShawzinCodeValidator validator) : IShawzinValidationTool
@@ -60,12 +75,45 @@ public sealed class ShawzinValidationTool(IShawzinCodeDecoder decoder, IShawzinC
     }
 
     public string CreateMappingTestSequence(ShawzinDefinition instrument, ShawzinScale scale)
+        => CreateMappingValidation(instrument, scale).Description;
+
+    public ShawzinMappingValidationSequence CreateMappingValidation(ShawzinDefinition instrument, ShawzinScale scale)
     {
         ArgumentNullException.ThrowIfNull(instrument);
         var definition = instrument.Scales[scale];
-        return string.Join(Environment.NewLine, definition.Positions.OrderBy(value => value.Pitch).ThenBy(value => value.Input.String).ThenBy(value => value.Input.Frets)
-            .Select((value, index) => $"{index + 1:00}. Pitch {value.Pitch} -> String {value.Input.String}, Frets {value.Input.Frets}"));
+        var positions = definition.Positions.Select(value => new ShawzinValidationPosition(
+            value.PositionIndex + 1,
+            value.Pitch,
+            NoteName(value.Pitch),
+            value.Input.String,
+            value.Input.Frets,
+            value.CodeSymbol)).ToArray();
+        var events = definition.Positions.Select(value => new ShawzinEvent(
+            StablePositionId(scale, value.PositionIndex),
+            new AbsoluteTime(value.PositionIndex * 0.5m),
+            new ShawzinChord([value.Input]))).ToList();
+        var encoded = encoder.Encode(new ShawzinSong(new ShawzinTrack
+        {
+            Name = $"{definition.DisplayName} validation",
+            InstrumentId = instrument.Id,
+            Scale = scale,
+            ShawzinEvents = events,
+        }));
+        if (!encoded.IsSuccess || encoded.Code is null)
+            throw new InvalidOperationException("The deterministic twelve-note validation song could not be encoded.");
+        var description = string.Join(Environment.NewLine, positions.Select(value =>
+            $"{value.Index:00}. Pitch {value.Pitch} ({value.NoteName}) -> String {value.String}, Fret {value.Fret}, Symbol {value.CodeSymbol}"));
+        return new(instrument.PlayProfile.Id, scale, positions, description, encoded.Code);
     }
+
+    private static string NoteName(int pitch)
+    {
+        string[] names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        return $"{names[pitch % 12]}{pitch / 12 - 1}";
+    }
+
+    private static Guid StablePositionId(ShawzinScale scale, int position) =>
+        Guid.Parse($"00000000-0000-0000-{(int)scale:x4}-{position + 1:x12}");
 
     private static IReadOnlyList<string> Compare(string input, string output)
     {

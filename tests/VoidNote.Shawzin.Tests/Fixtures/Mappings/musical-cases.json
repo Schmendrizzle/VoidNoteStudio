@@ -1,0 +1,6 @@
+[
+  { "name": "A chromatic C4 through B4", "scale": "Chromatic", "pitches": [60,61,62,63,64,65,66,67,68,69,70,71] },
+  { "name": "B simple C major melody", "scale": "Major", "pitches": [60,62,64,67,64,62,60] },
+  { "name": "C simple C minor melody", "scale": "Minor", "pitches": [60,63,67,68,67,63,60] },
+  { "name": "D synthetic monophonic test motif", "scale": "Major", "pitches": [60,64,67,72,71,67,64,60] }
+]

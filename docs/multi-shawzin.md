@@ -63,7 +63,7 @@ Alle Strategien sind deterministisch. Standardnamen sind `Lead`, `Harmony 1`, `H
 
 Die Trackverteilung ist `TrackAssigned / Assigned × 100`. Der Balance Score vergleicht jede Verteilung mit `100 / TrackCount` und zieht die mittlere absolute Abweichung ab. Dieser Wert ist Diagnose, kein hartes Gleichverteilungsziel: Rollenpassung und Kontinuität besitzen im Zuordnungsscore Vorrang.
 
-`EnsembleOptimizationReport` aggregiert Quell-, arrangierte, verworfene und doppelte Noten, Note Loss, durchschnittliche und niedrigste Compatibility, Voice Continuity, Balance sowie die mittlere absolute Pitchänderung aus Transposition, Oktavshift und Pitchsubstitution. Empfehlungen werden nur aus transparenten Schwellenwerten erzeugt.
+`EnsembleOptimizationReport` aggregiert Quell-, arrangierte, verworfene und doppelte Noten, Note Loss, Overall Playability, Overall Musical Similarity, Pitch Change Rate, Timing Change Rate, Voice Continuity, Balance sowie die mittlere absolute Pitchänderung aus Transposition, Oktavshift und Pitchsubstitution. Die Änderungsraten zählen eindeutige Quell-IDs. Empfehlungen werden nur aus transparenten Schwellenwerten erzeugt.
 
 ## Split Report und Datenintegrität
 
@@ -85,7 +85,7 @@ Jede Stimme erhält über die bestehenden Services Scale Candidates, Transpositi
 
 ## Multi-Code Export
 
-`EnsembleCodeExporter` kodiert jeden erfolgreichen `ShawzinTrack` unabhängig. Der Bericht enthält Trackname, Instrument, Skala, Transposition, Eventzahl, Dauer, Compatibility, Code, Codelänge, Validierungsstatus und strukturierte Fehler. Eine fehlgeschlagene Spur verhindert nicht, dass erfolgreiche Spuren samt eigenem Status sichtbar bleiben.
+`EnsembleCodeExporter` kodiert jeden erfolgreichen `ShawzinTrack` unabhängig. Der Bericht enthält Trackname, Instrument, Skala, Transposition, Eventzahl, Dauer, Compatibility/Playability, Musical Similarity, Code, Codelänge, Validierungsstatus und strukturierte Fehler. Eine fehlgeschlagene Spur verhindert nicht, dass erfolgreiche Spuren samt eigenem Status sichtbar bleiben.
 
 ## Übergabe an Creator Mode
 

@@ -28,6 +28,7 @@ public interface IShawzinPitchMapper
 {
     ShawzinPitchMappingResult Map(int pitch, ShawzinDefinition instrument, ShawzinScale scale);
     ShawzinPitchCandidate? FindClosest(int pitch, ShawzinDefinition instrument, ShawzinScale scale);
+    int ReconstructPitch(ShawzinNote input, ShawzinDefinition instrument, ShawzinScale scale);
 }
 
 /// <summary>Maps normalized musical pitches through instrument data to physical Shawzin inputs.</summary>
@@ -69,6 +70,18 @@ public sealed class ShawzinPitchMapper : IShawzinPitchMapper
             .ThenBy(value => value.Input.Frets)
             .Select(value => new ShawzinPitchCandidate(value.Pitch, value.Input, value.Pitch - pitch))
             .FirstOrDefault();
+
+    public int ReconstructPitch(ShawzinNote input, ShawzinDefinition instrument, ShawzinScale scale)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        var matches = GetScale(instrument, scale).Positions.Where(value => value.Input == input).ToArray();
+        return matches.Length switch
+        {
+            1 => matches[0].Pitch,
+            0 => throw new ArgumentException($"Input '{input.Frets}/{input.String}' is not a real single-note position in scale '{scale}'.", nameof(input)),
+            _ => throw new InvalidOperationException($"Scale '{scale}' defines input '{input.Frets}/{input.String}' more than once."),
+        };
+    }
 
     private static ShawzinScaleDefinition GetScale(ShawzinDefinition instrument, ShawzinScale scale) =>
         instrument.PlayProfile.Scales.TryGetValue(scale, out var definition)

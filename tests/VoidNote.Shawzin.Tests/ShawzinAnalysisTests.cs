@@ -28,7 +28,7 @@ public sealed class ShawzinAnalysisTests
     [Fact]
     public void ScaleRanking_UsesPitchClassesAndDirectCoverage()
     {
-        var track = Track(Note(0, 48), Note(480, 50), Note(960, 52), Note(1440, 55), Note(1920, 57));
+        var track = Track(Note(0, 60), Note(480, 62), Note(960, 64), Note(1440, 67), Note(1920, 69));
         var candidates = new ShawzinScaleAnalyzer().Analyze(track, _instrument);
 
         Assert.Equal(9, candidates.Count);
@@ -39,12 +39,23 @@ public sealed class ShawzinAnalysisTests
     [Fact]
     public void TranspositionRanking_FindsBetterCandidateWithoutApplyingIt()
     {
-        var track = Track(Note(0, 49), Note(480, 51), Note(960, 53));
+        var track = Track(Note(0, 61), Note(480, 63), Note(960, 66));
         var candidates = new ShawzinTranspositionAnalyzer(_mapper).Analyze(track, Timeline, _instrument, ShawzinScale.Major);
 
         Assert.Equal(25, candidates.Count);
         Assert.True(candidates[0].Score >= candidates.Single(value => value.Semitones == 0).Score);
         Assert.Contains(candidates, value => value.Semitones == 0);
+    }
+
+    [Fact]
+    public void Compatibility_StronglyPenalizesTrackWhereEveryPitchChanges()
+    {
+        var track = Track(Note(0, 48), Note(480, 50), Note(960, 52), Note(1440, 53));
+        var report = new ShawzinCompatibilityAnalyzer(_mapper).Analyze(track, Timeline, _instrument, ShawzinScale.Chromatic);
+
+        Assert.Equal(0, report.DirectlyPlayableNotes);
+        Assert.Equal(100m, report.ExpectedChangeRatePercent);
+        Assert.InRange(report.OverallScore, 0, 69);
     }
 
     private static ProjectTimeline Timeline { get; } = ProjectTimeline.CreateDefault();

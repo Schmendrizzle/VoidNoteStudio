@@ -17,6 +17,14 @@ internal static class MidiFixtureFactory
             new FixtureNote(480, 480, 64, 90),
         ]));
 
+    public static MemoryStream ChromaticValidation() => Create(
+        new FixtureTrack("Chromatic validation", Enumerable.Range(0, 12)
+            .Select(index => new FixtureNote(index * 120, 120, checked((byte)(60 + index)), 100)).ToArray()));
+
+    public static MemoryStream SyntheticKnownMotif() => Create(
+        new FixtureTrack("Synthetic test motif", new byte[] { 60, 64, 67, 72, 71, 67, 64, 60 }
+            .Select((pitch, index) => new FixtureNote(index * 120, 120, pitch, 96)).ToArray()));
+
     public static MemoryStream Chord() => Create(
         new FixtureTrack("Chord",
         [

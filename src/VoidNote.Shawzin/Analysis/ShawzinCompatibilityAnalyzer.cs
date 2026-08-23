@@ -23,6 +23,11 @@ public sealed class ShawzinCompatibilityAnalyzer(IShawzinPitchMapper mapper) : I
         var octave = mappings.Count(value => value.Kind == ShawzinPitchMappingKind.OctaveShiftable);
         var outside = mappings.Count(value => value.Kind == ShawzinPitchMappingKind.OutsideRange);
         var unsupported = mappings.Count(value => value.Kind == ShawzinPitchMappingKind.NotAvailable);
+        var quality = notes.Select(note => PitchQuality.Evaluate(note.Pitch, _mapper, instrument, scale)).ToArray();
+        var substitutions = quality.Count(value => value.Kind == PitchQualityKind.Substitution);
+        var dropped = quality.Count(value => value.Kind == PitchQualityKind.Dropped);
+        var meanPitchError = quality.Length == 0 ? 0m : quality.Average(value => (decimal)value.Distance);
+        var maximumPitchError = quality.Select(value => value.Distance).DefaultIfEmpty().Max();
 
         var groups = notes.GroupBy(value => value.StartTime.Ticks).ToArray();
         var polyphony = groups.Count(group => group.Count() > 3);
@@ -36,15 +41,20 @@ public sealed class ShawzinCompatibilityAnalyzer(IShawzinPitchMapper mapper) : I
         var timing = collisions;
         var dense = CountDenseWindows(notes, timeline);
 
-        var pitchScore = notes.Length == 0 ? 100m : (direct + octave * 0.75m) * 100m / notes.Length;
-        var groupCount = Math.Max(1, groups.Length);
-        var penalty = Math.Min(10m, timing * 10m / groupCount)
-                    + Math.Min(10m, polyphony * 10m / groupCount)
-                    + Math.Min(10m, chordConflicts * 10m / groupCount)
-                    + Math.Min(5m, dense * 5m / groupCount);
+        var expectedChanged = octave + substitutions + dropped;
+        var changeRate = notes.Length == 0 ? 0m : expectedChanged * 100m / notes.Length;
+        var pitchScore = notes.Length == 0 ? 100m : quality.Sum(value => value.Quality) * 100m / notes.Length;
+        var noteCount = Math.Max(1, notes.Length);
+        var penalty = meanPitchError * 1.5m
+                    + changeRate * 0.15m
+                    + Math.Min(12m, timing * 100m / noteCount * 0.20m)
+                    + Math.Min(12m, polyphony * 100m / noteCount * 0.25m)
+                    + Math.Min(12m, chordConflicts * 100m / noteCount * 0.20m)
+                    + Math.Min(6m, dense * 100m / noteCount * 0.10m);
         var score = (int)decimal.Round(Math.Clamp(pitchScore - penalty, 0m, 100m), 0, MidpointRounding.AwayFromZero);
 
-        return new ShawzinCompatibilityReport(notes.Length, direct, unsupported, outside, octave, timing, polyphony, chordConflicts, collisions, dense, score);
+        return new ShawzinCompatibilityReport(notes.Length, direct, unsupported, outside, octave, timing, polyphony, chordConflicts, collisions, dense, score,
+            substitutions, dropped, decimal.Round(meanPitchError, 2), maximumPitchError, decimal.Round(changeRate, 1));
     }
 
     internal static bool CanFormChord(IReadOnlyList<ShawzinPitchMappingResult> mappings)

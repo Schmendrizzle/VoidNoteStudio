@@ -85,7 +85,13 @@ public sealed class ShawzinArranger(IShawzinPitchMapper mapper) : IShawzinArrang
             new ArrangementTimingMetrics(timingErrors.DefaultIfEmpty(0m).Max(), timingErrors.Length == 0 ? 0m : timingErrors.Average(), collidedEvents),
             track.Events.Count,
             scheduled.Count,
-            scheduled.Sum(value => value.Notes.Count));
+            scheduled.Sum(value => value.Notes.Count),
+            CalculateSimilarity(track.Events, scheduled, timeline, options))
+        {
+            ExactNoteCount = scheduled.SelectMany(value => value.Notes).Count(value => value.Source.Pitch == value.TargetPitch),
+            MeanPitchErrorSemitones = scheduled.SelectMany(value => value.Notes).Select(value => (decimal)Math.Abs(value.TargetPitch - value.Source.Pitch)).DefaultIfEmpty().Average(),
+            MaximumPitchErrorSemitones = scheduled.SelectMany(value => value.Notes).Select(value => Math.Abs(value.TargetPitch - value.Source.Pitch)).DefaultIfEmpty().Max(),
+        };
         if (report.HasUnresolvedConflicts) return new ShawzinArrangementResult(null, report);
 
         var shawzinEvents = scheduled.Select((value, index) => new ShawzinEvent(
@@ -113,8 +119,15 @@ public sealed class ShawzinArranger(IShawzinPitchMapper mapper) : IShawzinArrang
     private WorkingNote? Map(MusicalEvent source, ShawzinDefinition instrument, ArrangementOptions options, List<ArrangementChange> changes)
     {
         var pitch = source.Pitch;
+        var strict = options.Strategies.HasFlag(ArrangementStrategy.Strict);
         if (options.AllowTransposition && options.TranspositionSemitones != 0)
         {
+            if (strict)
+            {
+                changes.Add(new ArrangementChange(source.Id, source.Pitch, null, source.StartTime, null, ArrangementChangeType.ConflictUnresolved,
+                    "Strict strategy forbids configured transposition.", ArrangementStrategy.Strict));
+                return null;
+            }
             var transposed = pitch + options.TranspositionSemitones;
             if (transposed is < 0 or > 127)
             {
@@ -159,6 +172,8 @@ public sealed class ShawzinArranger(IShawzinPitchMapper mapper) : IShawzinArrang
         ref int previousTimestamp, List<ScheduledStrike> scheduled, ProjectTimeline timeline, ArrangementOptions options,
         List<ArrangementChange> changes, ref int collidedEvents)
     {
+        if (options.Strategies.HasFlag(ArrangementStrategy.Strict) && timestamp * options.QuantizationStepSeconds != sourceSeconds)
+            return false;
         if (timestamp <= previousTimestamp)
         {
             collidedEvents++;
@@ -279,6 +294,52 @@ public sealed class ShawzinArranger(IShawzinPitchMapper mapper) : IShawzinArrang
         if (options.TranspositionSemitones is < -12 or > 12) throw new ArgumentOutOfRangeException(nameof(options));
     }
 
+    private static MusicalSimilarityReport CalculateSimilarity(
+        IReadOnlyList<MusicalEvent> source,
+        IReadOnlyList<ScheduledStrike> scheduled,
+        ProjectTimeline timeline,
+        ArrangementOptions options)
+    {
+        if (source.Count == 0) return new(100m, 100m, 100m, 100m, 100m, 100m);
+        var arranged = scheduled.SelectMany(strike => strike.Notes.Select(note => new SimilarityNote(
+            note.Source,
+            note.TargetPitch,
+            strike.Timestamp * options.QuantizationStepSeconds))).ToDictionary(value => value.Source.Id);
+        var retained = source.Where(value => arranged.ContainsKey(value.Id))
+            .OrderBy(value => value.StartTime.Ticks).ThenBy(value => value.Pitch).ThenBy(value => value.Id).ToArray();
+        var pitch = source.Average(note => arranged.TryGetValue(note.Id, out var target)
+            ? PitchPreservation(note.Pitch, target.Pitch)
+            : 0m);
+        var retention = retained.Length * 100m / source.Count;
+        var timing = source.Average(note => arranged.TryGetValue(note.Id, out var target)
+            ? 100m * Math.Max(0m, 1m - Math.Abs(timeline.ToAbsoluteTime(note.StartTime).Seconds - target.Seconds) / 0.25m)
+            : 0m);
+        var contour = PairScore(retained, arranged, static (leftSource, rightSource, leftTarget, rightTarget) =>
+            Math.Sign(rightSource.Pitch - leftSource.Pitch) == Math.Sign(rightTarget.Pitch - leftTarget.Pitch) ? 100m : 0m);
+        var intervals = PairScore(retained, arranged, static (leftSource, rightSource, leftTarget, rightTarget) =>
+            100m * Math.Max(0m, 1m - Math.Abs((rightTarget.Pitch - leftTarget.Pitch) - (rightSource.Pitch - leftSource.Pitch)) / 12m));
+        var overall = 0.35m * pitch + 0.20m * contour + 0.20m * retention + 0.15m * timing + 0.10m * intervals;
+        return new(decimal.Round(overall, 1), decimal.Round(pitch, 1), decimal.Round(contour, 1), decimal.Round(retention, 1),
+            decimal.Round(timing, 1), decimal.Round(intervals, 1));
+    }
+
+    private static decimal PitchPreservation(int source, int target)
+    {
+        var distance = Math.Abs(target - source);
+        if (distance == 0) return 100m;
+        if (distance % 12 == 0) return Math.Max(40m, 70m - (distance / 12 - 1) * 15m);
+        return 100m * Math.Max(0m, 1m - distance / 12m);
+    }
+
+    private static decimal PairScore(
+        IReadOnlyList<MusicalEvent> retained,
+        IReadOnlyDictionary<Guid, SimilarityNote> arranged,
+        Func<MusicalEvent, MusicalEvent, SimilarityNote, SimilarityNote, decimal> score)
+    {
+        if (retained.Count < 2) return retained.Count == 0 ? 0m : 100m;
+        return retained.Zip(retained.Skip(1), (left, right) => score(left, right, arranged[left.Id], arranged[right.Id])).Average();
+    }
+
     private static Guid StableId(Guid trackId, IEnumerable<Guid> sourceIds, int timestamp, int discriminator)
     {
         var text = $"{trackId:N}|{string.Join(',', sourceIds.Order())}|{timestamp}|{discriminator}";
@@ -288,4 +349,5 @@ public sealed class ShawzinArranger(IShawzinPitchMapper mapper) : IShawzinArrang
 
     private sealed record WorkingNote(MusicalEvent Source, int TargetPitch, IReadOnlyList<ShawzinPitchCandidate> Candidates);
     private sealed record ScheduledStrike(int Timestamp, decimal SourceSeconds, IReadOnlyList<WorkingNote> Notes, ShawzinChord Chord);
+    private sealed record SimilarityNote(MusicalEvent Source, int Pitch, decimal Seconds);
 }

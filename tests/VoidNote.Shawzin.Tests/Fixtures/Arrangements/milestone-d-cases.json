@@ -1,11 +1,11 @@
 [
   { "name": "simple monophonic melody", "strategy": "Strict", "notes": [[0,60],[480,62],[960,64]], "expectedOutputNotes": 3 },
-  { "name": "scale", "strategy": "Strict", "notes": [[0,48],[480,49],[960,50],[1440,51],[1920,52]], "expectedOutputNotes": 5 },
-  { "name": "octave overflow", "strategy": "OctaveShift", "notes": [[0,36],[480,84]], "expectedOutputNotes": 2 },
-  { "name": "simple chords", "strategy": "Strict", "notes": [[0,48],[0,55],[0,62]], "expectedOutputNotes": 3 },
-  { "name": "complex chords", "strategy": "DropLowest", "notes": [[0,48],[0,55],[0,62],[0,69]], "expectedOutputNotes": 3 },
-  { "name": "polyphonic piano passage", "strategy": "PreserveMelody", "notes": [[0,48],[0,52],[0,55],[0,60],[480,50],[480,53],[480,57],[480,62]], "expectedOutputNotes": 4 },
+  { "name": "scale", "strategy": "Strict", "notes": [[0,60],[480,61],[960,62],[1440,63],[1920,64]], "expectedOutputNotes": 5 },
+  { "name": "octave overflow", "strategy": "OctaveShift", "notes": [[0,48],[480,83]], "expectedOutputNotes": 2 },
+  { "name": "simple chords", "strategy": "Strict", "notes": [[0,60],[0,61],[0,62]], "expectedOutputNotes": 3 },
+  { "name": "complex chords", "strategy": "DropLowest", "notes": [[0,60],[0,61],[0,62],[0,63]], "expectedOutputNotes": 3 },
+  { "name": "polyphonic piano passage", "strategy": "PreserveMelody", "notes": [[0,60],[0,61],[0,62],[0,63],[480,63],[480,64],[480,65],[480,66]], "expectedOutputNotes": 6 },
   { "name": "fast passage", "strategy": "Simplify, OctaveShift, PreserveMelody", "notes": [[0,60],[120,61],[240,62],[360,63],[480,64],[600,65],[720,66],[840,67],[960,68],[1080,69],[1200,60],[1320,61],[1440,62],[1560,63],[1680,64]], "expectedOutputNotes": 12 },
   { "name": "rests", "strategy": "Strict", "notes": [[0,60],[3840,62]], "expectedOutputNotes": 2 },
-  { "name": "boundary quantization", "strategy": "Strict", "notes": [[59,60],[119,62]], "expectedOutputNotes": 2 }
+  { "name": "boundary quantization", "strategy": "PreserveMelody", "notes": [[59,60],[119,62]], "expectedOutputNotes": 2 }
 ]

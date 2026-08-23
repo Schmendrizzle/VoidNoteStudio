@@ -13,6 +13,7 @@ public sealed record EnsembleTrackExport(
     int EventCount,
     decimal DurationSeconds,
     int Compatibility,
+    decimal MusicalSimilarity,
     string? Code,
     int CodeLength,
     bool IsValid,
@@ -39,13 +40,13 @@ public sealed class EnsembleCodeExporter(IShawzinCodeEncoder encoder) : IEnsembl
         {
             if (track.ShawzinTrack is null)
                 return new EnsembleTrackExport(track.Id, track.DisplayName, track.Instrument.DisplayName, track.Scale,
-                    track.TranspositionSemitones, 0, 0m, track.Compatibility?.OverallScore ?? 0, null, 0, false,
+                    track.TranspositionSemitones, 0, 0m, track.Compatibility?.OverallScore ?? 0, track.MusicalSimilarity, null, 0, false,
                     [new ShawzinCodeError(ShawzinCodeErrorCategory.InvalidModel, "The track has no successful arrangement.")]);
             var result = encoder.Encode(new ShawzinSong(track.ShawzinTrack));
             var duration = track.ShawzinTrack.ShawzinEvents.LastOrDefault()?.Position.Seconds ?? 0m;
             return new EnsembleTrackExport(track.Id, track.DisplayName, track.Instrument.DisplayName, track.Scale,
                 track.TranspositionSemitones, track.ShawzinTrack.ShawzinEvents.Count, duration,
-                track.Compatibility?.OverallScore ?? 0, result.Code, result.Code?.Length ?? 0, result.IsSuccess, result.Errors);
+                track.Compatibility?.OverallScore ?? 0, track.MusicalSimilarity, result.Code, result.Code?.Length ?? 0, result.IsSuccess, result.Errors);
         }).ToArray();
         return new EnsembleExportReport(exports);
     }

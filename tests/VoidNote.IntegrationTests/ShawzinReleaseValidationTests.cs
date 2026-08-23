@@ -35,4 +35,20 @@ public sealed class ShawzinReleaseValidationTests
 
         Assert.Equal(record, Assert.Single(await store.LoadAsync()));
     }
+
+    [Fact]
+    public void ValidationTool_GeneratesRealTwelvePositionTableAndSongCode()
+    {
+        var decoder = new WarframeShawzinCodeDecoder();
+        var validator = new WarframeShawzinCodeValidator(decoder);
+        var tool = new ShawzinValidationTool(decoder, new WarframeShawzinCodeEncoder(validator), validator);
+
+        var sequence = tool.CreateMappingValidation(BuiltInShawzinDefinitions.Default, ShawzinScale.Chromatic);
+
+        Assert.Equal(12, sequence.Positions.Count);
+        Assert.Equal(Enumerable.Range(60, 12), sequence.Positions.Select(value => value.Pitch));
+        Assert.Equal("BCEJKMRSUhik", string.Concat(sequence.Positions.Select(value => value.CodeSymbol)));
+        Assert.StartsWith("3", sequence.SongCode);
+        Assert.Equal(12, decoder.Decode(sequence.SongCode).Song!.Track.ShawzinEvents.Count);
+    }
 }

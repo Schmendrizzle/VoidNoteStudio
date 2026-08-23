@@ -14,15 +14,21 @@ public enum ShawzinCapabilities
 /// <summary>Associates a musical pitch with one physical Shawzin input.</summary>
 public sealed record ShawzinPitchPosition
 {
-    public ShawzinPitchPosition(int pitch, ShawzinNote input)
+    public ShawzinPitchPosition(int positionIndex, int pitch, ShawzinNote input, char codeSymbol)
     {
+        if (positionIndex is < 0 or > 11) throw new ArgumentOutOfRangeException(nameof(positionIndex));
         if (pitch is < 0 or > 127) throw new ArgumentOutOfRangeException(nameof(pitch));
+        if (codeSymbol == '\0') throw new ArgumentOutOfRangeException(nameof(codeSymbol));
+        PositionIndex = positionIndex;
         Pitch = pitch;
         Input = input ?? throw new ArgumentNullException(nameof(input));
+        CodeSymbol = codeSymbol;
     }
 
+    public int PositionIndex { get; }
     public int Pitch { get; }
     public ShawzinNote Input { get; }
+    public char CodeSymbol { get; }
 }
 
 /// <summary>Defines the pitches and physical input positions for one scale.</summary>
@@ -38,7 +44,11 @@ public sealed class ShawzinScaleDefinition
         if (positions.Count == 0) throw new ArgumentException("A scale must expose at least one pitch.", nameof(positions));
         Scale = scale;
         DisplayName = displayName;
-        _positions = positions.OrderBy(value => value.Pitch).ThenBy(value => value.Input.String).ThenBy(value => value.Input.Frets).ToArray();
+        if (positions.Select(value => value.PositionIndex).Distinct().Count() != positions.Count)
+            throw new ArgumentException("A scale cannot define the same physical position twice.", nameof(positions));
+        if (positions.Select(value => value.CodeSymbol).Distinct().Count() != positions.Count)
+            throw new ArgumentException("A scale cannot define the same single-note code symbol twice.", nameof(positions));
+        _positions = positions.OrderBy(value => value.PositionIndex).ToArray();
     }
 
     public ShawzinScale Scale { get; }

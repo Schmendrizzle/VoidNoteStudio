@@ -121,6 +121,14 @@ public static class EnsembleOptimizer
         var pitchChanges = ensemble.Tracks.SelectMany(value => value.ArrangementReport?.Changes ?? [])
             .Where(value => value.TargetPitch.HasValue && value.ChangeType is ArrangementChangeType.Transposed or ArrangementChangeType.OctaveShift or ArrangementChangeType.PitchSubstitution)
             .Select(value => Math.Abs(value.TargetPitch!.Value - value.SourcePitch)).ToArray();
+        var reports = ensemble.Tracks.Select(value => value.ArrangementReport).OfType<ArrangementReport>().ToArray();
+        var changedPitchNotes = reports.SelectMany(value => value.Changes)
+            .Where(value => value.ChangeType is ArrangementChangeType.Transposed or ArrangementChangeType.OctaveShift or ArrangementChangeType.PitchSubstitution)
+            .Select(value => value.SourceEventId).Distinct().Count();
+        var changedTimingNotes = reports.SelectMany(value => value.Changes)
+            .Where(value => value.ChangeType is ArrangementChangeType.Arpeggiated or ArrangementChangeType.Quantized)
+            .Select(value => value.SourceEventId).Distinct().Count();
+        var musicalSimilarity = reports.Length == 0 ? 100m : reports.Average(value => value.MusicalSimilarity.OverallScore);
         var recommendations = new List<string>();
         if (ensemble.SplitReport.Metrics.BalanceScore < 60m) recommendations.Add("Review the least populated voice; musical continuity currently outweighs balance.");
         if (compatibility.Any(value => value < 70)) recommendations.Add("Try a different scale or transposition on the lowest-compatibility track.");
@@ -129,6 +137,10 @@ public static class EnsembleOptimizer
             source == 0 ? 0m : decimal.Round((arrangementDrops + splitDrops) * 100m / source, 2),
             compatibility.Length == 0 ? 100m : decimal.Round(compatibility.Average(value => (decimal)value), 1),
             compatibility.Length == 0 ? 100 : compatibility.Min(), ensemble.SplitReport.Metrics.VoiceContinuityScore,
-            ensemble.SplitReport.Metrics.BalanceScore, pitchChanges.Length == 0 ? 0m : decimal.Round(pitchChanges.Average(value => (decimal)value), 2), recommendations);
+            ensemble.SplitReport.Metrics.BalanceScore, pitchChanges.Length == 0 ? 0m : decimal.Round(pitchChanges.Average(value => (decimal)value), 2),
+            compatibility.Length == 0 ? 100m : decimal.Round(compatibility.Average(value => (decimal)value), 1),
+            decimal.Round(musicalSimilarity, 1),
+            source == 0 ? 0m : decimal.Round(changedPitchNotes * 100m / source, 1),
+            source == 0 ? 0m : decimal.Round(changedTimingNotes * 100m / source, 1), recommendations);
     }
 }

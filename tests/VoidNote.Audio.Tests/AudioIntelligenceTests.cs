@@ -239,7 +239,7 @@ public sealed class AudioIntelligenceTests
         var mapper = new ShawzinPitchMapper();
         var compatibility = new ShawzinCompatibilityAnalyzer(mapper).Analyze(transcription.Track, ProjectTimeline.CreateDefault(), BuiltInShawzinDefinitions.Default, ShawzinScale.Chromatic);
         var arrangement = new ShawzinArranger(mapper).Arrange(transcription.Track, ProjectTimeline.CreateDefault(),
-            BuiltInShawzinDefinitions.Default, new() { Scale = ShawzinScale.Chromatic, Strategies = ArrangementStrategy.Strict });
+            BuiltInShawzinDefinitions.Default, new() { Scale = ShawzinScale.Chromatic, Strategies = ArrangementStrategy.PreserveMelody });
         var encoded = new WarframeShawzinCodeEncoder().Encode(new ShawzinSong(arrangement.Track!));
         Assert.True(compatibility.OverallScore > 0); Assert.True(arrangement.IsSuccess); Assert.Equal(3, arrangement.Report.OutputNoteCount);
         Assert.True(encoded.IsSuccess); Assert.False(string.IsNullOrWhiteSpace(encoded.Code));

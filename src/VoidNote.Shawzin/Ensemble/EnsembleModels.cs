@@ -104,6 +104,7 @@ public sealed class ShawzinEnsembleTrack
     public ShawzinCompatibilityReport? Compatibility { get; set; }
     public IReadOnlyList<ShawzinScaleCandidate> ScaleCandidates { get; set; } = [];
     public IReadOnlyList<ShawzinTranspositionCandidate> TranspositionCandidates { get; set; } = [];
+    public decimal MusicalSimilarity => ArrangementReport?.MusicalSimilarity.OverallScore ?? 0m;
     public bool IsActive { get; set; } = true;
     public bool IsMuted { get; set; }
     public bool IsSolo { get; set; }
@@ -132,4 +133,8 @@ public sealed record EnsembleOptimizationReport(
     decimal VoiceContinuityScore,
     decimal BalanceScore,
     decimal AverageAbsolutePitchChangeSemitones,
+    decimal OverallPlayability,
+    decimal OverallMusicalSimilarity,
+    decimal PitchChangeRatePercent,
+    decimal TimingChangeRatePercent,
     IReadOnlyList<string> Recommendations);

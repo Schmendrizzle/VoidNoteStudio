@@ -309,7 +309,14 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
             string.Join(Environment.NewLine, report.Differences.Concat(report.Errors));
     }
 
-    public void GenerateMappingSequence() => MappingSequence = shawzinValidation.CreateMappingTestSequence(SelectedInstrument, SelectedScale);
+    public void GenerateMappingSequence()
+    {
+        var validation = shawzinValidation.CreateMappingValidation(SelectedInstrument, SelectedScale);
+        MappingSequence = validation.Description + Environment.NewLine + Environment.NewLine + "Validation song code:" + Environment.NewLine + validation.SongCode;
+        ValidationCode = validation.SongCode;
+        SongCode = validation.SongCode;
+        Status = $"Generated the real twelve-position {SelectedScale} validation sequence for {SelectedInstrument.DisplayName}.";
+    }
 
     public async Task SaveMappingValidationAsync(bool confirmed, CancellationToken token = default)
     {
@@ -338,7 +345,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         if (SelectedTrack is null || _timeline is null) { Status = "Select a MIDI track first."; return; }
         var analysis = _workflow.Analyze(SelectedTrack, _timeline, SelectedInstrument, SelectedScale);
         var report = analysis.Compatibility;
-        Compatibility = $"{report.OverallScore}/100 · direct {report.DirectlyPlayablePercent}% · octave {report.OctaveFixablePercent}% · unsupported {report.UnsupportedPercent}% · conflicts {report.TimingConflicts + report.PolyphonyConflicts + report.ChordConflicts}";
+        Compatibility = $"Playable {report.OverallScore}% · direct {report.DirectlyPlayablePercent}% · octave {report.OctaveFixablePercent}% · substitutions {report.PitchSubstitutionNotes} · expected change {report.ExpectedChangeRatePercent}% · mean pitch error {report.MeanPitchErrorSemitones:0.##} st · conflicts {report.TimingConflicts + report.PolyphonyConflicts + report.ChordConflicts}";
         Status = $"Best scale: {analysis.ScaleCandidates[0].DisplayName}; best transposition: {analysis.TranspositionCandidates[0].Semitones:+#;-#;0}.";
     }
 
@@ -360,7 +367,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         }
         OnPropertyChanged(nameof(HasPreview));
         Status = result.Arrangement.IsSuccess
-            ? $"Arranged {result.Arrangement.Report.OutputNoteCount} notes with {result.Arrangement.Report.Changes.Count} reported changes."
+            ? $"Arranged {result.Arrangement.Report.OutputNoteCount} notes · {result.Arrangement.Report.TotalChangedSourceNotes} changed ({result.Arrangement.Report.ChangeRatePercent}%) · musical similarity {result.Arrangement.Report.MusicalSimilarity.OverallScore}%."
             : $"Arrangement has {result.Arrangement.Report.Changes.Count(value => value.ChangeType == ArrangementChangeType.ConflictUnresolved)} unresolved conflict(s).";
     }
 
@@ -401,7 +408,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         _previewWave = multiWorkflow.Preview(_ensemble).WaveData;
         var metrics = _ensemble.OptimizationReport!;
         EnsembleReport = $"Source {metrics.SourceNoteCount} · arranged {metrics.ArrangedNoteCount} · loss {metrics.NoteLossPercent}% · " +
-            $"compatibility avg {metrics.AverageCompatibility} / min {metrics.LowestTrackCompatibility} · continuity {metrics.VoiceContinuityScore}% · balance {metrics.BalanceScore}%";
+            $"playability {metrics.OverallPlayability}% · musical similarity {metrics.OverallMusicalSimilarity}% · pitch changes {metrics.PitchChangeRatePercent}% · timing changes {metrics.TimingChangeRatePercent}% · continuity {metrics.VoiceContinuityScore}% · balance {metrics.BalanceScore}%";
         EnsembleDetails = string.Join(Environment.NewLine, _ensemble.SplitReport.Assignments.Select(value =>
             $"{value.SourceTime.Ticks}: pitch {value.SourcePitch} → {value.TargetTrackName} ({value.Confidence:P0}) · {value.Reason}")) +
             Environment.NewLine + string.Join(Environment.NewLine, _ensemble.SplitReport.LaterArrangementChanges.Select(value =>
@@ -658,7 +665,7 @@ public sealed class EnsembleTrackViewModel : INotifyPropertyChanged
     public bool IsSolo { get => Model.IsSolo; set { Model.IsSolo = value; Notify(); _changed(); } }
     public int Compatibility => Model.Compatibility?.OverallScore ?? 0;
     public string Code { get => _code; set { _code = value; Notify(); } }
-    public string Report => Model.ArrangementReport is null ? "No arrangement" : $"{Model.ArrangementReport.OutputNoteCount}/{Model.ArrangementReport.SourceNoteCount} notes; {Model.ArrangementReport.Changes.Count} changes";
+    public string Report => Model.ArrangementReport is null ? "No arrangement" : $"{Model.ArrangementReport.OutputNoteCount}/{Model.ArrangementReport.SourceNoteCount} notes; {Model.ArrangementReport.TotalChangedSourceNotes} changed ({Model.ArrangementReport.ChangeRatePercent}%); similarity {Model.MusicalSimilarity}%";
     public void NotifyAnalysisChanged() { Notify(nameof(Compatibility)); Notify(nameof(Report)); }
     private void Recalculate() { _arranger.RearrangeTrack(_ensemble, Model); Notify(); NotifyAnalysisChanged(); _changed(); }
     private void Notify([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

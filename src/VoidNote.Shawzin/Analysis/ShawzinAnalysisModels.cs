@@ -14,7 +14,12 @@ public sealed record ShawzinCompatibilityReport(
     int ChordConflicts,
     int QuantizationCollisions,
     int ExcessiveDensityWindows,
-    int OverallScore)
+    int OverallScore,
+    int PitchSubstitutionNotes,
+    int DroppedNotes,
+    decimal MeanPitchErrorSemitones,
+    int MaximumPitchErrorSemitones,
+    decimal ExpectedChangeRatePercent)
 {
     public decimal DirectlyPlayablePercent => Percentage(DirectlyPlayableNotes);
     public decimal OctaveFixablePercent => Percentage(OctaveFixableNotes);
@@ -30,7 +35,12 @@ public sealed record ShawzinScaleCandidate(
     int TotalNotes,
     decimal DirectCoveragePercent,
     decimal PitchClassFitPercent,
-    decimal SuitabilityScore);
+    decimal SuitabilityScore,
+    int OctaveFixableNotes,
+    int NotPlayableNotes,
+    int PitchSubstitutionNotes,
+    decimal MeanPitchErrorSemitones,
+    int MaximumPitchErrorSemitones);
 
 /// <summary>Scores one non-applied semitone transposition.</summary>
 public sealed record ShawzinTranspositionCandidate(
@@ -39,4 +49,8 @@ public sealed record ShawzinTranspositionCandidate(
     int OctaveFixableNotes,
     int LostNotes,
     int Conflicts,
-    decimal Score);
+    decimal Score,
+    int PitchSubstitutionNotes,
+    int DroppedNotes,
+    decimal MeanPitchErrorSemitones,
+    int MaximumPitchErrorSemitones);

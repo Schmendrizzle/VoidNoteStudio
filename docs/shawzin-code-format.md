@@ -40,6 +40,8 @@ Es findet keine übliche Base64-Bytekodierung und keine Padding-Verarbeitung sta
 
 Der Code speichert kein Instrument oder Tuning. Das Klangprofil der ausgewählten Shawzin ist daher keine Codec-Metadatenquelle.
 
+Die Skalenkennung allein reicht auch nicht zur Rekonstruktion einer MIDI-Tonhöhe: Erst das reale Spielprofil ordnet das folgende Note-Symbol einer absoluten Tonhöhe zu. Das Standardprofil und seine zwölf Positionen sind in `docs/shawzin.md` dokumentiert. Der Codec blieb beim Accuracy-Fix unverändert; korrigiert wurde die musikalische Interpretation vor und nach dem Wire-Format.
+
 ## Note- und Chord-Kodierung
 
 Das erste Zeichen eines Events ist ein 6-Bit-Wert:
@@ -72,6 +74,8 @@ Eine einzelne Saite wird als `ShawzinNote`, mehrere Saiten unter derselben Fret-
 | `H` | 7 | alle drei Saiten, kein Fret |
 | `J` | 9 | Saite 1, Sky |
 | `/` | 63 | alle drei Saiten, Sky + Earth + Water |
+
+Die zwölf normalen Einzeltonpositionen haben unabhängig von der Skala die Zeichen `B,C,E,J,K,M,R,S,U,h,i,k`. Mehrfach-Fretzeichen bleiben gültige Codec-/Chorddaten, gehören aber nicht zur 12-Noten-Pitchtabelle.
 
 ## Timing
 
@@ -125,7 +129,7 @@ Fehler enthalten Kategorie, nullbasierte Position im Code, problematisches Symbo
 
 ## Golden Fixtures und Roundtrip
 
-Die Offline-Fixtures liegen unter `tests/VoidNote.Shawzin.Tests/Fixtures` und umfassen Einzelnoten, mehrere Noten, Chords, minimale Abstände, maximale Pause, Randwerte, 256 Events, ungültige Zeichen, ungültiges Timing, abgeschnittene Codes, Reihenfolgefehler und nicht klingende Symbole. Ein kurzer achtstufiger Community-Referenzcode stammt aus dem technischen Beispiel der japanischen Warframe-Wiki. Tests vergleichen gültige Codes nach `Decode → Encode` bytegenau und Songs nach `Encode → Decode` semantisch.
+Die Offline-Fixtures liegen unter `tests/VoidNote.Shawzin.Tests/Fixtures` und umfassen zusätzlich alle neun realen 12-Position-Mappings sowie Chromatic, eine Durmelodie, eine Mollmelodie und ein synthetisches monophones Motiv. Tests vergleichen gültige Codes nach `Decode → Encode` bytegenau, Songs nach `Encode → Decode` semantisch und rekonstruieren nach `MIDI → Arrangement → Encode → Decode` über das Spielprofil wieder die exakten arrangierten Pitches.
 
 ## Recherchequellen
 

@@ -24,12 +24,23 @@ public sealed class ShawzinArrangerTests
     }
 
     [Fact]
+    public void Strict_RejectsOffGridTimingInsteadOfMovingTheNote()
+    {
+        var result = Arrange(Track(Note(59, 60)), ArrangementStrategy.Strict);
+
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Track);
+        Assert.Contains(result.Report.Changes, change => change.ChangeType == ArrangementChangeType.ConflictUnresolved);
+        Assert.DoesNotContain(result.Report.Changes, change => change.ChangeType == ArrangementChangeType.Quantized);
+    }
+
+    [Fact]
     public void ClosestPitch_SubstitutesAndReportsUnavailablePitch()
     {
         var result = Arrange(Track(Note(0, 49)), ArrangementStrategy.ClosestPitch, ShawzinScale.Major);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(48, Assert.Single(result.Track!.Events).Pitch);
+        Assert.Equal(60, Assert.Single(result.Track!.Events).Pitch);
         Assert.Contains(result.Report.Changes, change => change.ChangeType == ArrangementChangeType.PitchSubstitution && change.Strategy == ArrangementStrategy.ClosestPitch);
     }
 
@@ -52,12 +63,12 @@ public sealed class ShawzinArrangerTests
         var change = Assert.Single(result.Report.Changes, value => value.ChangeType == ArrangementChangeType.OctaveShift);
         Assert.Equal(source.Id, change.SourceEventId);
         Assert.Equal(36, change.SourcePitch);
-        Assert.Equal(48, change.TargetPitch);
+        Assert.Equal(60, change.TargetPitch);
         Assert.Equal(ArrangementStrategy.OctaveShift, change.Strategy);
     }
 
     [Fact]
-    public void ConfiguredTransposition_IsNeverAppliedSilently()
+    public void Strict_ConfiguredTranspositionIsAnUnresolvedConflict()
     {
         var result = _arranger.Arrange(Track(Note(0, 58)), Timeline, _instrument, new ArrangementOptions
         {
@@ -67,16 +78,15 @@ public sealed class ShawzinArrangerTests
             TranspositionSemitones = 2,
         });
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal("dax", result.Track!.InstrumentId);
-        Assert.Equal(60, Assert.Single(result.Track.Events).Pitch);
-        Assert.Contains(result.Report.Changes, value => value.ChangeType == ArrangementChangeType.Transposed);
+        Assert.False(result.IsSuccess);
+        Assert.Null(result.Track);
+        Assert.Contains(result.Report.Changes, value => value.ChangeType == ArrangementChangeType.ConflictUnresolved);
     }
 
     [Fact]
     public void ValidChord_IsPreservedAsOnePhysicalEvent()
     {
-        var result = Arrange(Track(Note(0, 48), Note(0, 55), Note(0, 62)), ArrangementStrategy.Strict);
+        var result = Arrange(Track(Note(0, 60), Note(0, 61), Note(0, 62)), ArrangementStrategy.Strict);
 
         Assert.True(result.IsSuccess);
         var output = Assert.Single(result.Track!.ShawzinEvents);
@@ -87,10 +97,10 @@ public sealed class ShawzinArrangerTests
     [Theory]
     [InlineData(ArrangementStrategy.PreserveMelody, 62)]
     [InlineData(ArrangementStrategy.DropLowest, 62)]
-    [InlineData(ArrangementStrategy.DropHighest, 48)]
+    [InlineData(ArrangementStrategy.DropHighest, 60)]
     public void VoicePolicies_SelectExpectedEdgeVoice(ArrangementStrategy strategy, int expectedPitch)
     {
-        var result = Arrange(Track(Note(0, 48), Note(0, 52), Note(0, 55), Note(0, 62)), strategy);
+        var result = Arrange(Track(Note(0, 60), Note(0, 61), Note(0, 62), Note(0, 63)), strategy);
 
         Assert.True(result.IsSuccess);
         Assert.Contains(result.Track!.Events, value => value.Pitch == expectedPitch);
@@ -101,7 +111,7 @@ public sealed class ShawzinArrangerTests
     [Fact]
     public void Arpeggiate_DistributesInvalidChordWithinConfiguredBound()
     {
-        var result = Arrange(Track(Note(0, 48), Note(0, 52), Note(0, 55)), ArrangementStrategy.Arpeggiate);
+        var result = Arrange(Track(Note(0, 60), Note(0, 64), Note(0, 68)), ArrangementStrategy.Arpeggiate);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, result.Track!.ShawzinEvents.Count);
@@ -130,6 +140,20 @@ public sealed class ShawzinArrangerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(12, result.Report.OutputNoteCount);
         Assert.Equal(3, result.Report.Changes.Count(value => value.ChangeType == ArrangementChangeType.DroppedNote));
+    }
+
+    [Fact]
+    public void Report_CountsUniqueChangedSourceNotesAndSeparatesSimilarity()
+    {
+        var result = Arrange(Track(Note(59, 48)), ArrangementStrategy.OctaveShift | ArrangementStrategy.Arpeggiate);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Report.Changes.Count);
+        Assert.Equal(1, result.Report.TotalChangedSourceNotes);
+        Assert.Equal(100m, result.Report.ChangeRatePercent);
+        Assert.Equal(1, result.Report.OctaveShiftCount);
+        Assert.Equal(1, result.Report.TimingModifiedCount);
+        Assert.InRange(result.Report.MusicalSimilarity.OverallScore, 0m, 99.9m);
     }
 
     [Fact]

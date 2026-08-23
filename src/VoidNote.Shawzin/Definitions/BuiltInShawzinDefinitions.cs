@@ -5,6 +5,22 @@ namespace VoidNote.Shawzin.Definitions;
 /// <summary>Provides immutable built-in instrument data without embedding mapping decisions in algorithms.</summary>
 public static class BuiltInShawzinDefinitions
 {
+    private static readonly (ShawzinString String, ShawzinFret Fret, char Symbol)[] PhysicalPositions =
+    [
+        (ShawzinString.First, ShawzinFret.None, 'B'),
+        (ShawzinString.Second, ShawzinFret.None, 'C'),
+        (ShawzinString.Third, ShawzinFret.None, 'E'),
+        (ShawzinString.First, ShawzinFret.Sky, 'J'),
+        (ShawzinString.Second, ShawzinFret.Sky, 'K'),
+        (ShawzinString.Third, ShawzinFret.Sky, 'M'),
+        (ShawzinString.First, ShawzinFret.Earth, 'R'),
+        (ShawzinString.Second, ShawzinFret.Earth, 'S'),
+        (ShawzinString.Third, ShawzinFret.Earth, 'U'),
+        (ShawzinString.First, ShawzinFret.Water, 'h'),
+        (ShawzinString.Second, ShawzinFret.Water, 'i'),
+        (ShawzinString.Third, ShawzinFret.Water, 'k'),
+    ];
+
     private static readonly ShawzinPlayProfile StandardProfile = CreateStandardProfile();
     private static readonly IReadOnlyList<ShawzinDefinition> Definitions =
     [
@@ -31,37 +47,24 @@ public static class BuiltInShawzinDefinitions
         ?? throw new KeyNotFoundException($"Unknown Shawzin definition '{id}'.");
 
     private static ShawzinPlayProfile CreateStandardProfile() => new(
-        "standard-24-position",
+        "warframe-standard-12-position-v1",
         [
-            Scale(ShawzinScale.PentatonicMinor, "Pentatonic Minor", [0, 3, 5, 7, 10]),
-            Scale(ShawzinScale.PentatonicMajor, "Pentatonic Major", [0, 2, 4, 7, 9]),
-            Scale(ShawzinScale.Chromatic, "Chromatic", Enumerable.Range(0, 12).ToArray()),
-            Scale(ShawzinScale.Hexatonic, "Hexatonic", [0, 2, 4, 6, 8, 10]),
-            Scale(ShawzinScale.Major, "Major", [0, 2, 4, 5, 7, 9, 11]),
-            Scale(ShawzinScale.Minor, "Minor", [0, 2, 3, 5, 7, 8, 10]),
-            Scale(ShawzinScale.Hirajoshi, "Hirajoshi", [0, 2, 3, 7, 8]),
-            Scale(ShawzinScale.Phrygian, "Phrygian", [0, 1, 3, 5, 7, 8, 10]),
-            Scale(ShawzinScale.Yo, "Yo", [0, 2, 5, 7, 9]),
+            Scale(ShawzinScale.PentatonicMinor, "Pentatonic Minor", [60, 63, 65, 67, 70, 72, 75, 77, 79, 82, 84, 87]),
+            Scale(ShawzinScale.PentatonicMajor, "Pentatonic Major", [60, 62, 64, 67, 69, 72, 74, 76, 79, 81, 84, 86]),
+            Scale(ShawzinScale.Chromatic, "Chromatic", [60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71]),
+            Scale(ShawzinScale.Hexatonic, "Hexatonic", [60, 63, 65, 66, 67, 70, 72, 75, 77, 78, 79, 82]),
+            Scale(ShawzinScale.Major, "Major", [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79]),
+            Scale(ShawzinScale.Minor, "Minor", [60, 62, 63, 65, 67, 68, 70, 72, 74, 75, 77, 79]),
+            Scale(ShawzinScale.Hirajoshi, "Hirajoshi", [60, 61, 65, 66, 70, 72, 73, 77, 78, 82, 84, 85]),
+            Scale(ShawzinScale.Phrygian, "Phrygian Dominant", [60, 61, 64, 65, 67, 68, 70, 72, 73, 76, 77, 79]),
+            Scale(ShawzinScale.Yo, "Yo", [61, 63, 66, 68, 70, 73, 75, 78, 80, 82, 85, 87]),
         ]);
 
-    private static ShawzinScaleDefinition Scale(ShawzinScale scale, string name, IReadOnlyList<int> pitchClasses)
+    private static ShawzinScaleDefinition Scale(ShawzinScale scale, string name, IReadOnlyList<int> pitches)
     {
-        const int rootPitch = 48;
-        int[] stringDegreeOffsets = [0, 7, 14];
-        var positions = new List<ShawzinPitchPosition>(24);
-        for (var stringIndex = 0; stringIndex < 3; stringIndex++)
-        {
-            for (var fretMask = 0; fretMask < 8; fretMask++)
-            {
-                var degree = stringDegreeOffsets[stringIndex] + fretMask;
-                var octave = degree / pitchClasses.Count;
-                var pitch = rootPitch + octave * 12 + pitchClasses[degree % pitchClasses.Count];
-                positions.Add(new ShawzinPitchPosition(
-                    pitch,
-                    new ShawzinNote((ShawzinString)(stringIndex + 1), (ShawzinFret)fretMask)));
-            }
-        }
-
+        if (pitches.Count != PhysicalPositions.Length) throw new ArgumentException("A real Warframe scale must define exactly twelve positions.", nameof(pitches));
+        var positions = PhysicalPositions.Select((physical, index) => new ShawzinPitchPosition(
+            index, pitches[index], new ShawzinNote(physical.String, physical.Fret), physical.Symbol)).ToArray();
         return new ShawzinScaleDefinition(scale, name, positions);
     }
 }

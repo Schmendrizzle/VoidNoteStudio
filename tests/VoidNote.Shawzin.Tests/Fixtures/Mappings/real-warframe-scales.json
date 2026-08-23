@@ -1,0 +1,28 @@
+{
+  "profileId": "warframe-standard-12-position-v1",
+  "positions": [
+    { "index": 0, "string": "First",  "fret": "None",  "symbol": "B" },
+    { "index": 1, "string": "Second", "fret": "None",  "symbol": "C" },
+    { "index": 2, "string": "Third",  "fret": "None",  "symbol": "E" },
+    { "index": 3, "string": "First",  "fret": "Sky",   "symbol": "J" },
+    { "index": 4, "string": "Second", "fret": "Sky",   "symbol": "K" },
+    { "index": 5, "string": "Third",  "fret": "Sky",   "symbol": "M" },
+    { "index": 6, "string": "First",  "fret": "Earth", "symbol": "R" },
+    { "index": 7, "string": "Second", "fret": "Earth", "symbol": "S" },
+    { "index": 8, "string": "Third",  "fret": "Earth", "symbol": "U" },
+    { "index": 9, "string": "First",  "fret": "Water", "symbol": "h" },
+    { "index": 10, "string": "Second", "fret": "Water", "symbol": "i" },
+    { "index": 11, "string": "Third",  "fret": "Water", "symbol": "k" }
+  ],
+  "scales": [
+    { "scale": "PentatonicMinor", "pitches": [60,63,65,67,70,72,75,77,79,82,84,87] },
+    { "scale": "PentatonicMajor", "pitches": [60,62,64,67,69,72,74,76,79,81,84,86] },
+    { "scale": "Chromatic",       "pitches": [60,61,62,63,64,65,66,67,68,69,70,71] },
+    { "scale": "Hexatonic",       "pitches": [60,63,65,66,67,70,72,75,77,78,79,82] },
+    { "scale": "Major",           "pitches": [60,62,64,65,67,69,71,72,74,76,77,79] },
+    { "scale": "Minor",           "pitches": [60,62,63,65,67,68,70,72,74,75,77,79] },
+    { "scale": "Hirajoshi",       "pitches": [60,61,65,66,70,72,73,77,78,82,84,85] },
+    { "scale": "Phrygian",        "pitches": [60,61,64,65,67,68,70,72,73,76,77,79] },
+    { "scale": "Yo",              "pitches": [61,63,66,68,70,73,75,78,80,82,85,87] }
+  ]
+}

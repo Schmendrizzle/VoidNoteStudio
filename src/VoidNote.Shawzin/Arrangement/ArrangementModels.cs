@@ -59,15 +59,40 @@ public sealed record ArrangementTimingMetrics(
     decimal AverageErrorSeconds,
     int CollidedEvents);
 
+/// <summary>Separates musical fidelity from technical Shawzin playability.</summary>
+public sealed record MusicalSimilarityReport(
+    decimal OverallScore,
+    decimal PitchPreservation,
+    decimal MelodicContourPreservation,
+    decimal NoteRetention,
+    decimal TimingPreservation,
+    decimal IntervalPreservation);
+
 /// <summary>Contains every transformation and aggregate arrangement metrics.</summary>
 public sealed record ArrangementReport(
     IReadOnlyList<ArrangementChange> Changes,
     ArrangementTimingMetrics Timing,
     int SourceNoteCount,
     int OutputEventCount,
-    int OutputNoteCount)
+    int OutputNoteCount,
+    MusicalSimilarityReport MusicalSimilarity)
 {
     public bool HasUnresolvedConflicts => Changes.Any(value => value.ChangeType == ArrangementChangeType.ConflictUnresolved);
+    public int ExactNoteCount { get; init; }
+    public int OctaveShiftCount => Changed(ArrangementChangeType.OctaveShift);
+    public int PitchSubstitutionCount => Changed(ArrangementChangeType.PitchSubstitution);
+    public int DroppedNoteCount => Changed(ArrangementChangeType.DroppedNote);
+    public int ArpeggiatedCount => Changed(ArrangementChangeType.Arpeggiated);
+    public int TimingModifiedCount => Changes.Where(value => value.ChangeType is ArrangementChangeType.Arpeggiated or ArrangementChangeType.Quantized)
+        .Select(value => value.SourceEventId).Distinct().Count();
+    public int TotalChangedSourceNotes => Changes.Where(value => value.ChangeType != ArrangementChangeType.ConflictUnresolved)
+        .Select(value => value.SourceEventId).Distinct().Count();
+    public decimal ChangeRatePercent => SourceNoteCount == 0 ? 0m : decimal.Round(TotalChangedSourceNotes * 100m / SourceNoteCount, 1);
+    public decimal MeanPitchErrorSemitones { get; init; }
+    public int MaximumPitchErrorSemitones { get; init; }
+
+    private int Changed(ArrangementChangeType type) => Changes.Where(value => value.ChangeType == type)
+        .Select(value => value.SourceEventId).Distinct().Count();
 }
 
 /// <summary>Contains a complete track or an explicit unresolved report.</summary>
