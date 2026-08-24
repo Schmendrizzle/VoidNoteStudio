@@ -132,6 +132,18 @@ public sealed partial class MainWindow : Window
     private async void DuplicateProfile_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.DuplicateProfileAsync();
     private async void DeleteProfile_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.DeleteProfileAsync();
     private async void StartIngame_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.StartIngameAsync();
+    private async void StartDelay_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox comboBox && comboBox.SelectedIndex >= 0)
+        {
+            ViewModel.SelectedStartDelayIndex = comboBox.SelectedIndex;
+            if (ViewModel.IsInitialized)
+            {
+                try { await ViewModel.SaveStartDelayAsync(); }
+                catch (Exception exception) { await ShowErrorAsync("The GameBridge start delay could not be saved.", exception); }
+            }
+        }
+    }
     private async void EmergencyStop_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => await ViewModel.EmergencyStopAsync();
 
     private async Task ShowErrorAsync(string message, Exception exception)

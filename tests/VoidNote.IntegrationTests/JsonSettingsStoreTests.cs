@@ -16,6 +16,37 @@ public sealed class JsonSettingsStoreTests
 
         Assert.Equal(AppSettings.CurrentSchemaVersion, settings.SchemaVersion);
         Assert.Equal(ThemePreference.System, settings.Appearance.Theme);
+        Assert.Equal(5, settings.GameBridge.StartDelaySeconds);
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(5)]
+    [InlineData(10)]
+    public async Task SaveAndLoadAsync_RoundTripsSupportedGameBridgeStartDelay(int seconds)
+    {
+        using var directory = new TemporaryDirectory();
+        var store = new JsonSettingsStore(new AppPathProvider(directory.Path));
+
+        await store.SaveAsync(new AppSettings { GameBridge = new GameBridgeSettings { StartDelaySeconds = seconds } });
+        var settings = await store.LoadAsync();
+
+        Assert.Equal(seconds, settings.GameBridge.StartDelaySeconds);
+    }
+
+    [Fact]
+    public async Task LoadAsync_NormalizesUnsupportedGameBridgeStartDelayToFiveSeconds()
+    {
+        using var directory = new TemporaryDirectory();
+        var paths = new AppPathProvider(directory.Path);
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.SettingsFilePath)!);
+        await File.WriteAllTextAsync(paths.SettingsFilePath, """
+            { "SchemaVersion": 2, "GameBridge": { "StartDelaySeconds": 7 } }
+            """);
+
+        var settings = await new JsonSettingsStore(paths).LoadAsync();
+
+        Assert.Equal(5, settings.GameBridge.StartDelaySeconds);
     }
 
     [Fact]

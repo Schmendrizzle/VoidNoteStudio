@@ -48,6 +48,10 @@ Create a session from selected ensemble tracks. For each take, review preparatio
 
 Diagnostic mode validates profiles and timing without real keys. Real input remains disarmed until the third-party warning is acknowledged and **Arm** is deliberately selected. Focus loss, errors, stop, emergency stop and application shutdown release held keys and disarm. Windows uses documented `SendInput`; Linux supports X11/XTest only. Wayland has no privileged workaround.
 
+Before a real start, choose **Start delay**: 3, 5 or 10 seconds (default 5). After **Start**, stay in the existing Ingame Playback panel and use the large number and progress bar to switch to Warframe. VoidNote checks focus only when the countdown finishes. If Warframe is focused, the song starts at `0.000`; otherwise playback aborts, releases all keys and disarms. **Stop** and **EMERGENCY STOP** remain available throughout the countdown. VoidNote never brings Warframe to the foreground itself.
+
+Dry run has no countdown and requires no Warframe focus. A real Dynamic Scale start uses the same countdown, but all note and scale-change times remain relative to the later playback time `0.000`.
+
 VoidNote Studio is independent and not affiliated with or endorsed by Digital Extremes. Third-party software is used with Warframe at the user's own risk. No claim of approval or ban safety is made. Never use the music bridge for combat, movement, missions, resources or AFK gameplay.
 
 ## Dependency Center
@@ -74,5 +78,6 @@ Choose System, Light or Dark, plus English or German. These settings apply relia
 - **No live audio:** configure FFplay; offline synthetic WAV generation still works.
 - **AI unavailable:** verify the exact Python interpreter contains the package and Worker path exists.
 - **Wayland GameBridge unavailable:** use diagnostic mode/export or an X11 session; no root workaround is provided.
+- **Playback aborts after the countdown:** make sure Warframe—not VoidNote—is the focused window when **Checking focus…** appears. Arm again before retrying because a failed focus check deliberately disarms GameBridge.
 - **Project recovery shown:** compare project and timestamp, recover to unsaved state, then save explicitly to a chosen `.vns` file.
 - **Project rejected:** external `.vns` files are untrusted; invalid paths, duplicate entries, symlinks, excessive sizes and suspicious compression are rejected.

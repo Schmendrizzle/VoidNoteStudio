@@ -10,6 +10,8 @@ Die GameBridge ist vollständig optional. Ist ein Backend nicht verfügbar oder 
 
 ```text
 ShawzinTrack
+  → GameBridgeStartDelay (3/5/10 s, keine Inputs, noch keine Song-Timeline)
+  → initiale Zielfokusprüfung
   → ShawzinPlaybackEngine (ein absoluter monotonic-clock-Anker)
   → GameBridgePlaybackOutput (Fokus, Timing, Release-All, Diagnostik)
   → ShawzinInputMapper (Event → portable Action)
@@ -48,9 +50,19 @@ Der Startzustand ist `DISARMED`. Vor dem ersten Arm muss der Benutzer den Dritts
 
 Standardmäßig muss der konfigurierte Zielfenstertitel im Vordergrund sein. Ist eine zuverlässige Prüfung nicht verfügbar, startet realer Input bei aktivierter Fokuspflicht nicht. Das persistierte Verhalten ist `Abort` (sicherer Default) oder `Ignore`; eine automatische Shawzin-Modus-Erkennung gibt es nicht. Die Anwendung bietet einen jederzeit sichtbaren Emergency-Stop. Ein systemweiter globaler Hotkey ist noch eine offene plattformspezifische Entscheidung.
 
+### Sicherer verzögerter Start
+
+Ein echter Start aus dem Block **Ingame-Wiedergabe** beginnt mit einer lokal gespeicherten Verzögerung von 3, 5 oder 10 Sekunden; Default sind 5 Sekunden. Im selben Block erscheinen die große verbleibende Sekundenzahl, eine gleichmäßig fortschreitende Leiste und der Hinweis, jetzt zu Warframe zu wechseln. Start und Auswahl sind währenddessen deaktiviert, Stop und NOT-STOPP bleiben verfügbar. Es wird kein Dialog geöffnet und VoidNote übernimmt den Fokus niemals automatisch.
+
+Während des Countdowns werden keine synthetischen Eingaben erzeugt und keine Fokusprüfung ausgeführt. Erst nach seinem Ende zeigt die UI **Fokusprüfung…** und prüft das konfigurierte Warframe-Fenster. Bei falschem oder nicht zuverlässig prüfbarem Fokus folgen Abort, Release All und Disarm. Bei korrektem Fokus wird erst danach die Playback Engine erzeugt; ihr Zeitanker und damit Songzeit `0.000` beginnen nicht beim Klick auf Start, sondern unmittelbar vor den eigentlichen Songevents. Der bestehende Fokuscheck unmittelbar vor jedem realen Input bleibt als zweite Safety-Schicht erhalten.
+
+Stop während des Countdowns bricht nur den vorbereitenden Start ab, sendet keine Inputs, gibt vorsorglich alle von VoidNote gehaltenen Tasten frei und disarmed. NOT-STOPP verwendet denselben Abbruchpfad und bleibt auch während der Verzögerung aktiv.
+
 ## Diagnostic Mode und Dry Run
 
 `DiagnosticGameInputBridge` sendet niemals reale Eingaben. Es protokolliert Taste, KeyDown/KeyUp, lokalen Timestamp und Event-ID. Dry Run validiert das Profil und führt denselben Mapping-/Playbackpfad gegen diese Bridge aus. Ergebnisdaten umfassen Eventzahl, Inputzahl, Mappingfehler, ungeklärte Bindungen, geplante Zeit, tatsächliche Dispatch-Zeit, Abweichung, abgebrochene Events, Fokusverluste und Emergency Stops. Es gibt keine Telemetrie und keinen Upload.
+
+Dry Run benötigt weder Warframe-Fokus noch Start-Countdown und bleibt vollständig innerhalb von VoidNote ausführbar.
 
 Bei Dynamic Playback enthält der Dry Run zusätzlich Quell-/Zielskala, Abschnitt, Grund und Benefit Score jedes Wechsels, Timing-Sicherheit sowie einzelne und gesamte TAB-Presses. Vor realem Start zeigt VoidNote `Set your Shawzin to: <Start Scale>`. Die GameBridge liest den Spielzustand nicht und erkennt die aktuelle Skala nicht automatisch; der Benutzer muss die angezeigte Initialskala selbst einstellen.
 

@@ -73,7 +73,12 @@ public sealed class JsonSettingsStore(IAppPathProvider pathProvider) : ISettings
             Autosave = autosave with { CustomIntervalMinutes = Math.Clamp(autosave.CustomIntervalMinutes, 1, 1440) },
             Storage = storage with { MigrationBackupRetention = Math.Clamp(storage.MigrationBackupRetention, 1, 10) },
             Audio = audio,
-            GameBridge = gameBridge,
+            GameBridge = gameBridge with
+            {
+                StartDelaySeconds = GameBridgeSettings.SupportedStartDelaySeconds.Contains(gameBridge.StartDelaySeconds)
+                    ? gameBridge.StartDelaySeconds
+                    : GameBridgeSettings.DefaultStartDelaySeconds,
+            },
             AudioIntelligence = intelligence with
             {
                 MaximumParallelJobs = Math.Clamp(intelligence.MaximumParallelJobs, 1, 4),

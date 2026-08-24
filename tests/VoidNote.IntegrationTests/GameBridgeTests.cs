@@ -173,7 +173,7 @@ public sealed class GameBridgeTests
         Assert.Empty(bridge.HeldKeys); Assert.Equal(GameInputTransition.KeyUp, bridge.Events[^1].Transition);
     }
 
-    private GameBridgePlaybackSession Session(IGameInputBridge bridge, GameBridgeArmController arm) => new(bridge, _mapper, new KeybindProfileValidator(), new Focus(true), arm);
+    private GameBridgePlaybackSession Session(IGameInputBridge bridge, GameBridgeArmController arm) => new(bridge, _mapper, new KeybindProfileValidator(), new Focus(true), arm, new SystemGameBridgeStartDelay());
     private GameBridgePlaybackOutput Output(IGameInputBridge bridge) => new(bridge, _mapper, _profile, new Focus(true), "Warframe", true, FastTiming());
     private static GameBridgeTimingOptions FastTiming() => new(TimeSpan.Zero, TimeSpan.FromMilliseconds(1), TimeSpan.Zero);
     private static ShawzinEvent Event(decimal seconds, ShawzinFret frets, params ShawzinString[] strings) => new(Guid.NewGuid(), new(seconds), new(strings.Select(x => new ShawzinNote(x, frets)).ToArray()));

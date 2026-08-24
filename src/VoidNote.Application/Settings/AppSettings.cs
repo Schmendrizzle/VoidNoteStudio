@@ -130,7 +130,11 @@ public sealed record AudioIntelligenceSettings
 /// <summary>Contains safe defaults for the optional external-input adapter.</summary>
 public sealed record GameBridgeSettings
 {
+    public const int DefaultStartDelaySeconds = 5;
+    public static IReadOnlyList<int> SupportedStartDelaySeconds { get; } = [3, 5, 10];
+
     public bool DisclaimerAcknowledged { get; init; }
+    public int StartDelaySeconds { get; init; } = DefaultStartDelaySeconds;
     public TargetFocusLossBehavior FocusLossBehavior { get; init; } = TargetFocusLossBehavior.Abort;
     public string TargetWindowTitle { get; init; } = "Warframe";
     public int KeyDownLeadMilliseconds { get; init; } = 5;

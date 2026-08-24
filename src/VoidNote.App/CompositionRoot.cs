@@ -133,6 +133,7 @@ internal static class CompositionRoot
         services.AddSingleton<GameBridgeArmController>();
         services.AddSingleton<IGameInputBridge>(_ => PlatformGameInputBridgeFactory.CreateBridge());
         services.AddSingleton<IGameTargetFocusService>(_ => PlatformGameInputBridgeFactory.CreateFocusService());
+        services.AddSingleton<IGameBridgeStartDelay, SystemGameBridgeStartDelay>();
         services.AddSingleton<GameBridgePlaybackSession>();
         services.AddSingleton<IVoidNoteDiagnosticsService>(_ => new VoidNoteDiagnosticsService(
             paths,

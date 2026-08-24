@@ -81,6 +81,12 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     private string _validationReport = "Paste a Shawzin code to decode, validate and re-encode it.";
     private string _mappingSequence = string.Empty;
     private string _projectNameDraft = VoidNote.Domain.Projects.ProjectName.Default;
+    private bool _isIngamePlaybackActive;
+    private bool _isStartCountdownActive;
+    private bool _isCheckingGameFocus;
+    private int _countdownRemainingSeconds = GameBridgeSettings.DefaultStartDelaySeconds;
+    private double _countdownProgress;
+    private bool _isInitialized;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public AudioLabViewModel AudioLab { get; } = audioLab;
@@ -195,6 +201,39 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     public string GameBridgeStatus { get => _gameBridgeStatus; private set => Set(ref _gameBridgeStatus, value); }
     public bool IsGameBridgeArmed => gameBridge.ArmState == VoidNote.GameBridge.Safety.GameBridgeArmState.Armed;
     public bool DisclaimerAcknowledged => _settings.GameBridge.DisclaimerAcknowledged;
+    public bool IsInitialized => _isInitialized;
+    public int SelectedStartDelayIndex
+    {
+        get
+        {
+            return _settings.GameBridge.StartDelaySeconds switch { 3 => 0, 10 => 2, _ => 1 };
+        }
+        set
+        {
+            if (value < 0 || value >= GameBridgeSettings.SupportedStartDelaySeconds.Count) return;
+            var seconds = GameBridgeSettings.SupportedStartDelaySeconds[value];
+            if (seconds == _settings.GameBridge.StartDelaySeconds) return;
+            _settings = _settings with { GameBridge = _settings.GameBridge with { StartDelaySeconds = seconds } };
+            OnPropertyChanged();
+        }
+    }
+    public bool IsIngamePlaybackActive { get => _isIngamePlaybackActive; private set { if (Set(ref _isIngamePlaybackActive, value)) OnPropertyChanged(nameof(CanStartIngame)); } }
+    public bool CanStartIngame => !IsIngamePlaybackActive;
+    public bool IsStartCountdownActive
+    {
+        get => _isStartCountdownActive;
+        private set
+        {
+            if (!Set(ref _isStartCountdownActive, value)) return;
+            OnPropertyChanged(nameof(CanChangeStartDelay));
+            OnPropertyChanged(nameof(IsCountdownTickVisible));
+        }
+    }
+    public bool CanChangeStartDelay => !IsStartCountdownActive;
+    public bool IsCheckingGameFocus { get => _isCheckingGameFocus; private set { if (Set(ref _isCheckingGameFocus, value)) OnPropertyChanged(nameof(IsCountdownTickVisible)); } }
+    public bool IsCountdownTickVisible => IsStartCountdownActive && !IsCheckingGameFocus;
+    public int CountdownRemainingSeconds { get => _countdownRemainingSeconds; private set => Set(ref _countdownRemainingSeconds, value); }
+    public double CountdownProgress { get => _countdownProgress; private set => Set(ref _countdownProgress, value); }
     public int ShawzinCount { get => _shawzinCount; set => Set(ref _shawzinCount, value); }
     public MultiShawzinSplitStrategy SplitStrategy { get => _splitStrategy; set => Set(ref _splitStrategy, value); }
     public IReadOnlyList<EnsembleTrackViewModel> EnsembleTracks { get => _ensembleTracks; private set { _ensembleTracks = value; OnPropertyChanged(); } }
@@ -226,7 +265,9 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         projectNameEditor.ProjectNameChanged += ProjectNameChanged;
         jobs.JobChanged += JobsChanged;
         RestartAutosaveLoop();
-        OnPropertyChanged(nameof(GameBridgeAvailability)); OnPropertyChanged(nameof(DisclaimerAcknowledged)); OnPropertyChanged(nameof(SelectedCulture)); OnPropertyChanged(nameof(SelectedTheme)); OnPropertyChanged(nameof(SelectedAutosaveInterval));
+        CountdownRemainingSeconds = _settings.GameBridge.StartDelaySeconds;
+        OnPropertyChanged(nameof(GameBridgeAvailability)); OnPropertyChanged(nameof(DisclaimerAcknowledged)); OnPropertyChanged(nameof(SelectedCulture)); OnPropertyChanged(nameof(SelectedTheme)); OnPropertyChanged(nameof(SelectedAutosaveInterval)); OnPropertyChanged(nameof(SelectedStartDelayIndex));
+        _isInitialized = true;
     }
 
     public void NewProject()
@@ -327,6 +368,8 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         _settings = _settings with { General = _settings.General with { FirstRunCompleted = true } };
         await settingsStore.SaveAsync(_settings, token); Status = "Settings saved. Language and theme are applied reliably after restart.";
     }
+
+    public async Task SaveStartDelayAsync(CancellationToken token = default) => await settingsStore.SaveAsync(_settings, token);
 
     public void ValidateShawzinCode()
     {
@@ -485,7 +528,13 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         OnPropertyChanged(nameof(IsGameBridgeArmed)); OnPropertyChanged(nameof(DisclaimerAcknowledged));
     }
 
-    public async Task DisarmAsync() { await gameBridge.StopAsync(); GameBridgeStatus = "DISARMED"; OnPropertyChanged(nameof(IsGameBridgeArmed)); }
+    public async Task DisarmAsync()
+    {
+        await gameBridge.StopAsync();
+        ResetStartState();
+        GameBridgeStatus = "DISARMED";
+        OnPropertyChanged(nameof(IsGameBridgeArmed));
+    }
 
     public async Task SaveProfileAsync(CancellationToken token = default)
     {
@@ -512,21 +561,32 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     public async Task StartIngameAsync(CancellationToken token = default)
     {
         if (_arrangedTrack is null || SelectedKeybindProfile is null) { GameBridgeStatus = "Arrange a valid track and select a keybind profile first."; return; }
+        if (IsIngamePlaybackActive) return;
         var value = _settings.GameBridge;
+        IsIngamePlaybackActive = true;
+        CountdownRemainingSeconds = value.StartDelaySeconds;
+        CountdownProgress = 0;
+        IsStartCountdownActive = true;
+        IsCheckingGameFocus = false;
+        var progress = new Progress<GameBridgeStartProgress>(UpdateStartProgress);
         try
         {
-            GameBridgeStatus = "Playing…";
+            GameBridgeStatus = $"Playback starts in {value.StartDelaySeconds}. Switch to Warframe now.";
             var timing = Timing(value);
             if (PlaybackMode == ShawzinArrangementMode.DynamicIngame && _dynamicPlan is not null)
                 await gameBridge.PlayDynamicAsync(_dynamicPlan, SelectedKeybindProfile, timing,
-                    value.TargetWindowTitle, value.FocusLossBehavior == TargetFocusLossBehavior.Abort, token);
+                    value.TargetWindowTitle, value.FocusLossBehavior == TargetFocusLossBehavior.Abort,
+                    TimeSpan.FromSeconds(value.StartDelaySeconds), progress, token);
             else
                 await gameBridge.PlayAsync(_arrangedTrack, SelectedKeybindProfile, timing,
-                    value.TargetWindowTitle, value.FocusLossBehavior == TargetFocusLossBehavior.Abort, token);
-            GameBridgeStatus = FormatDiagnostics("Completed", gameBridge.LastDiagnostics);
+                    value.TargetWindowTitle, value.FocusLossBehavior == TargetFocusLossBehavior.Abort,
+                    TimeSpan.FromSeconds(value.StartDelaySeconds), progress, token);
+            GameBridgeStatus = gameBridge.LastDiagnostics is null
+                ? "Stopped safely before playback · no inputs sent · DISARMED"
+                : FormatDiagnostics("Completed", gameBridge.LastDiagnostics);
         }
         catch (Exception exception) { logger.LogError(exception, "GameBridge playback failed and was stopped."); GameBridgeStatus = $"Stopped and disarmed: {exception.Message}"; }
-        finally { OnPropertyChanged(nameof(IsGameBridgeArmed)); }
+        finally { ResetStartState(); OnPropertyChanged(nameof(IsGameBridgeArmed)); }
     }
 
     public async Task DryRunAsync(CancellationToken token = default)
@@ -546,7 +606,22 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         GameBridgeStatus = result.MappingErrors.Count > 0 ? string.Join(" ", result.MappingErrors) : $"Test input recorded {result.InputCount} diagnostic transitions; no real keys were sent.";
     }
 
-    public async Task EmergencyStopAsync() { await gameBridge.EmergencyStopAsync(); GameBridgeStatus = "EMERGENCY STOP · all keys released · DISARMED"; OnPropertyChanged(nameof(IsGameBridgeArmed)); }
+    public async Task EmergencyStopAsync() { await gameBridge.EmergencyStopAsync(); ResetStartState(); GameBridgeStatus = "EMERGENCY STOP · all keys released · DISARMED"; OnPropertyChanged(nameof(IsGameBridgeArmed)); }
+    private void UpdateStartProgress(GameBridgeStartProgress progress)
+    {
+        CountdownRemainingSeconds = progress.RemainingSeconds;
+        CountdownProgress = progress.Completion * 100d;
+        IsCheckingGameFocus = progress.Phase == GameBridgeStartPhase.CheckingFocus;
+        IsStartCountdownActive = progress.Phase != GameBridgeStartPhase.Ready;
+        if (progress.Phase == GameBridgeStartPhase.CheckingFocus) GameBridgeStatus = "Checking focus…";
+        else if (progress.Phase == GameBridgeStartPhase.Ready) GameBridgeStatus = "Playing…";
+    }
+    private void ResetStartState()
+    {
+        IsIngamePlaybackActive = false;
+        IsStartCountdownActive = false;
+        IsCheckingGameFocus = false;
+    }
     private static string FormatDiagnostics(string prefix, PlaybackDiagnostics? diagnostics)
     {
         if (diagnostics is null) return prefix;

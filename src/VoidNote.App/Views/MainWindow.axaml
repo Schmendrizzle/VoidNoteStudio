@@ -228,8 +228,25 @@
                 <Button Grid.Column="2" Content="{DynamicResource DryRun}" Click="DryRun_Click" />
               </Grid>
               <Button Content="{DynamicResource DiagnosticInput}" Click="TestInput_Click" />
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <TextBlock Text="{DynamicResource StartDelay}" VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1" SelectedIndex="{Binding SelectedStartDelayIndex}" IsEnabled="{Binding CanChangeStartDelay}" SelectionChanged="StartDelay_SelectionChanged">
+                  <ComboBoxItem Content="{DynamicResource StartDelay3Seconds}" />
+                  <ComboBoxItem Content="{DynamicResource StartDelay5Seconds}" />
+                  <ComboBoxItem Content="{DynamicResource StartDelay10Seconds}" />
+                </ComboBox>
+              </Grid>
+              <Border IsVisible="{Binding IsStartCountdownActive}" Padding="14" CornerRadius="6" Background="#1A5AA9E6">
+                <StackPanel HorizontalAlignment="Stretch" Spacing="6">
+                  <TextBlock Text="{DynamicResource PlaybackStartsIn}" IsVisible="{Binding IsCountdownTickVisible}" HorizontalAlignment="Center" />
+                  <TextBlock Text="{Binding CountdownRemainingSeconds}" IsVisible="{Binding IsCountdownTickVisible}" FontSize="48" FontWeight="Bold" HorizontalAlignment="Center" />
+                  <ProgressBar Minimum="0" Maximum="100" Value="{Binding CountdownProgress}" IsVisible="{Binding IsCountdownTickVisible}" Height="8" />
+                  <TextBlock Text="{DynamicResource SwitchToWarframe}" IsVisible="{Binding IsCountdownTickVisible}" HorizontalAlignment="Center" FontWeight="SemiBold" />
+                  <TextBlock Text="{DynamicResource CheckingFocus}" IsVisible="{Binding IsCheckingGameFocus}" HorizontalAlignment="Center" FontWeight="SemiBold" />
+                </StackPanel>
+              </Border>
               <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                <Button Content="{DynamicResource Start}" Click="StartIngame_Click" />
+                <Button Content="{DynamicResource Start}" Click="StartIngame_Click" IsEnabled="{Binding CanStartIngame}" />
                 <Button Grid.Column="1" Content="{DynamicResource Stop}" Click="Disarm_Click" />
               </Grid>
               <Button Content="{DynamicResource EmergencyStop}" Background="#B3261E" Foreground="White" Click="EmergencyStop_Click" />

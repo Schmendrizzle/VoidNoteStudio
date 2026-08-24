@@ -63,6 +63,8 @@ AvailablePause >= TabPresses × (ScaleKeyPressDuration + ScaleKeyReleaseDelay)
 
 Defaults sind 35 ms Key-Down, 25 ms Release-Abstand und 50 ms Abstand vor der nächsten Note. Reicht das Fenster nicht, wird der Wechsel verworfen. `DynamicShawzinPlaybackEngine` mischt Scale- und Notenevents nach absoluten Zielzeiten auf einem monotonic-clock-Anker; die Dauer vorheriger Tastendrücke wird nie auf den nächsten Zielzeitpunkt addiert.
 
+Der echte Dynamic-Start verwendet denselben 3/5/10-Sekunden-Countdown wie Fixed Playback. Der Countdown liegt vollständig vor Fokusprüfung, Scheduler-Anker und Songzeit `0.000`; er wird deshalb niemals zu den absoluten Scale- oder Notenzeitpunkten addiert. Ein Wechsel bei `5.470` und eine zweite Phrase ab `6.000` bleiben auch mit 10 Sekunden Startverzögerung relativ zu Playback `0.000` exakt bei `5.470` beziehungsweise `6.000`.
+
 ## Initialskala und Sicherheit
 
 VoidNote liest weder Warframe-Prozessspeicher noch den aktuellen Spielzustand. Vor Start zeigt die UI `Set your Shawzin to: <Scale>`. Der Benutzer stellt diese Skala manuell ein. Optional kann die ausgewählte Skala als Startvorgabe erzwungen werden; ohne Override empfiehlt der Planner die beste Startskala.
@@ -81,6 +83,8 @@ Analyze zeigt für Fixed und Dynamic jeweils Playability, Musical Similarity, Su
 2. Eine eigene oder synthetische, nicht urheberrechtlich geschützte MIDI-Datei mit zwei durch eine Pause getrennten Pitchbereichen laden.
 3. Analyze ausführen und Fixed-/Dynamic-Metriken vergleichen.
 4. Dynamic Mode arrangieren, Preview anhören und den Dry Run auf Startskala, Wechselzeit, TAB-Zahl und `timing safe` prüfen.
-5. In Warframe die angezeigte Initialskala einstellen, GameBridge bewusst armen und Playback starten.
-6. Prüfen, dass der Wechsel vollständig in der Pause liegt und die zweite Phrase der Preview entspricht.
-7. Für einen teilbaren Code zurück zu Share Code Mode wechseln und die ausgewiesene niedrigere Fixed-Similarity akzeptieren.
+5. In Warframe die angezeigte Initialskala einstellen, GameBridge bewusst armen, 5 Sekunden Startverzögerung wählen und Playback starten.
+6. Während der sichtbaren Verzögerung zu Warframe wechseln; die Fokusprüfung darf erst nach dem Countdown erfolgen.
+7. Prüfen, dass Songzeit `0.000` erst danach beginnt, der Wechsel vollständig in der Pause liegt und die zweite Phrase der Preview entspricht.
+8. Für den RC-Regressionsplan Chromatic als Initialskala, Phrase 1 bei `0.000–4.800`, Chromatic → Pentatonic Major mit 8 TAB-Presses bei `5.470` und Phrase 2 bei `6.000–10.800` verifizieren.
+9. Für einen teilbaren Code zurück zu Share Code Mode wechseln und die ausgewiesene niedrigere Fixed-Similarity akzeptieren.

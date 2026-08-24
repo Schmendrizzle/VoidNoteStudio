@@ -19,12 +19,22 @@ public sealed class GameBridgePlaybackSession : IAsyncDisposable
     private readonly IKeybindProfileValidator _validator;
     private readonly IGameTargetFocusService _focus;
     private readonly GameBridgeArmController _arm;
+    private readonly IGameBridgeStartDelay _startDelay;
+    private readonly object _playbackGate = new();
     private ShawzinPlaybackEngine? _engine;
     private GameBridgePlaybackOutput? _output;
-    private CancellationTokenSource? _dynamicCancellation;
+    private CancellationTokenSource? _playbackCancellation;
 
-    public GameBridgePlaybackSession(IGameInputBridge bridge, IShawzinInputMapper mapper, IKeybindProfileValidator validator, IGameTargetFocusService focus, GameBridgeArmController arm)
-    { _bridge = bridge; _mapper = mapper; _validator = validator; _focus = focus; _arm = arm; }
+    public GameBridgePlaybackSession(IGameInputBridge bridge, IShawzinInputMapper mapper, IKeybindProfileValidator validator,
+        IGameTargetFocusService focus, GameBridgeArmController arm, IGameBridgeStartDelay startDelay)
+    {
+        _bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
+        _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+        _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        _focus = focus ?? throw new ArgumentNullException(nameof(focus));
+        _arm = arm ?? throw new ArgumentNullException(nameof(arm));
+        _startDelay = startDelay ?? throw new ArgumentNullException(nameof(startDelay));
+    }
 
     public GameInputCapability Capability => _bridge.Capability;
     public GameBridgeArmState ArmState => _arm.State;
@@ -32,23 +42,34 @@ public sealed class GameBridgePlaybackSession : IAsyncDisposable
     public void Arm(bool disclaimerAcknowledged) { if (!_bridge.Capability.IsAvailable) throw new InvalidOperationException(_bridge.Capability.Description); _arm.Arm(disclaimerAcknowledged); }
 
     public async Task PlayAsync(ShawzinTrack track, ShawzinKeybindProfile profile, GameBridgeTimingOptions timing, string targetTitle, bool requireFocus, CancellationToken token = default)
+        => await PlayAsync(track, profile, timing, targetTitle, requireFocus, TimeSpan.Zero, null, token).ConfigureAwait(false);
+
+    public async Task PlayAsync(ShawzinTrack track, ShawzinKeybindProfile profile, GameBridgeTimingOptions timing,
+        string targetTitle, bool requireFocus, TimeSpan delay, IProgress<GameBridgeStartProgress>? progress,
+        CancellationToken token = default)
     {
         _arm.EnsureArmed(); Validate(profile);
         await StopEngineAsync().ConfigureAwait(false);
-        _output = new(_bridge, _mapper, profile, _focus, targetTitle, requireFocus, timing); _output.Begin();
-        _engine = new(new SystemShawzinPlaybackScheduler(), _output);
-        try { await _engine.LoadAsync(track, token).ConfigureAwait(false); await _engine.PlayAsync(token).ConfigureAwait(false); }
+        using var playback = BeginPlayback(token);
+        try
+        {
+            if (!await PrepareStartAsync(delay, targetTitle, requireFocus, progress, playback.Token, token).ConfigureAwait(false)) return;
+            _output = new(_bridge, _mapper, profile, _focus, targetTitle, requireFocus, timing); _output.Begin();
+            _engine = new(new SystemShawzinPlaybackScheduler(), _output);
+            await _engine.LoadAsync(track, playback.Token).ConfigureAwait(false);
+            await _engine.PlayAsync(playback.Token).ConfigureAwait(false);
+        }
         catch { await FailSafeAsync().ConfigureAwait(false); throw; }
-        finally { _arm.Disarm(); }
+        finally { EndPlayback(playback); _arm.Disarm(); }
     }
 
     public async Task PlayRangeAsync(ShawzinTrack track, ShawzinKeybindProfile profile, GameBridgeTimingOptions timing,
         string targetTitle, bool requireFocus, AbsoluteTime sourceStart, AbsoluteTime duration, CancellationToken token = default)
     {
         _arm.EnsureArmed(); Validate(profile); await StopEngineAsync().ConfigureAwait(false);
+        using var range = BeginPlayback(token);
         _output = new(_bridge, _mapper, profile, _focus, targetTitle, requireFocus, timing); _output.Begin();
         _engine = new(new SystemShawzinPlaybackScheduler(), _output);
-        using var range = CancellationTokenSource.CreateLinkedTokenSource(token);
         if (duration.Seconds > 0) range.CancelAfter(TimeSpan.FromSeconds((double)duration.Seconds));
         try
         {
@@ -58,7 +79,7 @@ public sealed class GameBridgePlaybackSession : IAsyncDisposable
         }
         catch (OperationCanceledException) when (range.IsCancellationRequested && !token.IsCancellationRequested) { }
         catch { await FailSafeAsync().ConfigureAwait(false); throw; }
-        finally { _arm.Disarm(); }
+        finally { EndPlayback(range); _arm.Disarm(); }
     }
 
     public async Task<DryRunResult> DryRunAsync(ShawzinTrack track, ShawzinKeybindProfile profile, GameBridgeTimingOptions? timing = null, CancellationToken token = default)
@@ -76,15 +97,24 @@ public sealed class GameBridgePlaybackSession : IAsyncDisposable
 
     public async Task PlayDynamicAsync(DynamicShawzinScalePlan plan, ShawzinKeybindProfile profile, GameBridgeTimingOptions timing,
         string targetTitle, bool requireFocus, CancellationToken token = default)
+        => await PlayDynamicAsync(plan, profile, timing, targetTitle, requireFocus, TimeSpan.Zero, null, token).ConfigureAwait(false);
+
+    public async Task PlayDynamicAsync(DynamicShawzinScalePlan plan, ShawzinKeybindProfile profile, GameBridgeTimingOptions timing,
+        string targetTitle, bool requireFocus, TimeSpan delay, IProgress<GameBridgeStartProgress>? progress,
+        CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
         _arm.EnsureArmed(); Validate(profile); await StopEngineAsync().ConfigureAwait(false);
-        _dynamicCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
-        _output = new(_bridge, _mapper, profile, _focus, targetTitle, requireFocus, timing); _output.Begin();
-        var engine = new DynamicShawzinPlaybackEngine(new SystemShawzinPlaybackScheduler(), _output);
-        try { await engine.PlayAsync(plan, _dynamicCancellation.Token).ConfigureAwait(false); }
+        using var playback = BeginPlayback(token);
+        try
+        {
+            if (!await PrepareStartAsync(delay, targetTitle, requireFocus, progress, playback.Token, token).ConfigureAwait(false)) return;
+            _output = new(_bridge, _mapper, profile, _focus, targetTitle, requireFocus, timing); _output.Begin();
+            var engine = new DynamicShawzinPlaybackEngine(new SystemShawzinPlaybackScheduler(), _output);
+            await engine.PlayAsync(plan, playback.Token).ConfigureAwait(false);
+        }
         catch { await FailSafeAsync().ConfigureAwait(false); throw; }
-        finally { _dynamicCancellation.Dispose(); _dynamicCancellation = null; _arm.Disarm(); }
+        finally { EndPlayback(playback); _arm.Disarm(); }
     }
 
     public async Task<DryRunResult> DryRunDynamicAsync(DynamicShawzinScalePlan plan, ShawzinKeybindProfile profile,
@@ -103,9 +133,63 @@ public sealed class GameBridgePlaybackSession : IAsyncDisposable
         return new(eventCount, output.Diagnostics.InputCount, [], output.Diagnostics, diagnostic.Events);
     }
 
-    public async Task StopAsync() { _dynamicCancellation?.Cancel(); await StopEngineAsync().ConfigureAwait(false); await _bridge.ReleaseAllAsync(CancellationToken.None).ConfigureAwait(false); _arm.Disarm(); }
+    public async Task StopAsync()
+    {
+        lock (_playbackGate) _playbackCancellation?.Cancel();
+        await StopEngineAsync().ConfigureAwait(false);
+        await _bridge.ReleaseAllAsync(CancellationToken.None).ConfigureAwait(false);
+        _arm.Disarm();
+    }
     public async Task EmergencyStopAsync() { _output?.RecordEmergencyStop(); await StopAsync().ConfigureAwait(false); }
     private void Validate(ShawzinKeybindProfile profile) { var r = _validator.Validate(profile); if (!r.IsValid) throw new InvalidDataException(string.Join(" ", r.Issues.Select(x => x.Message))); }
+    private CancellationTokenSource BeginPlayback(CancellationToken token)
+    {
+        var playback = CancellationTokenSource.CreateLinkedTokenSource(token);
+        lock (_playbackGate)
+        {
+            if (_playbackCancellation is not null)
+            {
+                playback.Dispose();
+                throw new InvalidOperationException("GameBridge playback is already active.");
+            }
+            _playbackCancellation = playback;
+            _output = null;
+        }
+        return playback;
+    }
+    private void EndPlayback(CancellationTokenSource playback)
+    {
+        lock (_playbackGate)
+        {
+            if (ReferenceEquals(_playbackCancellation, playback)) _playbackCancellation = null;
+        }
+    }
+    private async Task<bool> PrepareStartAsync(TimeSpan delay, string targetTitle, bool requireFocus,
+        IProgress<GameBridgeStartProgress>? progress, CancellationToken playbackToken, CancellationToken callerToken)
+    {
+        try
+        {
+            await _startDelay.WaitAsync(delay, progress, playbackToken).ConfigureAwait(false);
+            playbackToken.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) when (playbackToken.IsCancellationRequested && !callerToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        progress?.Report(new(GameBridgeStartPhase.CheckingFocus, delay, TimeSpan.Zero, 1d));
+        EnsureInitialFocus(targetTitle, requireFocus);
+        playbackToken.ThrowIfCancellationRequested();
+        progress?.Report(new(GameBridgeStartPhase.Ready, delay, TimeSpan.Zero, 1d));
+        return true;
+    }
+    private void EnsureInitialFocus(string targetTitle, bool requireFocus)
+    {
+        if (!requireFocus) return;
+        var focus = _focus.GetStatus(targetTitle);
+        if (focus.IsSupported && focus.IsTargetFocused) return;
+        throw new GameBridgeFocusException(focus.Description);
+    }
     private async Task StopEngineAsync() { if (_engine is null) return; await _engine.StopAsync().ConfigureAwait(false); await _engine.DisposeAsync().ConfigureAwait(false); _engine = null; }
     private async Task FailSafeAsync() { try { await _bridge.ReleaseAllAsync(CancellationToken.None).ConfigureAwait(false); } finally { _arm.Disarm(); } }
     public async ValueTask DisposeAsync() { await StopAsync().ConfigureAwait(false); await _bridge.DisposeAsync().ConfigureAwait(false); }
