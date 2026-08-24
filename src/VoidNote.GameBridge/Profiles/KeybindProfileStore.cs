@@ -12,6 +12,7 @@ public interface IKeybindProfileStore
 /// <summary>Persists profiles locally and atomically in an independently versioned document.</summary>
 public sealed class JsonKeybindProfileStore(IAppPathProvider paths, IKeybindProfileValidator validator) : IKeybindProfileStore
 {
+    private const int CurrentSchemaVersion = 2;
     private sealed record Document(int SchemaVersion, IReadOnlyList<ShawzinKeybindProfile> Profiles);
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.General) { WriteIndented = true };
 
@@ -21,13 +22,15 @@ public sealed class JsonKeybindProfileStore(IAppPathProvider paths, IKeybindProf
         await using var stream = File.OpenRead(paths.GameBridgeProfilesFilePath);
         var document = await JsonSerializer.DeserializeAsync<Document>(stream, Options, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidDataException("The GameBridge profile document is empty.");
-        if (document.SchemaVersion != 1) throw new InvalidDataException($"Unsupported GameBridge profile schema: {document.SchemaVersion}.");
-        foreach (var profile in document.Profiles)
+        if (document.SchemaVersion is < 1 or > CurrentSchemaVersion) throw new InvalidDataException($"Unsupported GameBridge profile schema: {document.SchemaVersion}.");
+        var profiles = document.Profiles.Select(profile => document.SchemaVersion == 1 ? AddScaleSelect(profile) : profile).ToArray();
+        foreach (var profile in profiles)
         {
             var result = validator.Validate(profile);
-            if (!result.IsValid) throw new InvalidDataException($"Profile '{profile.Name}' is invalid: {string.Join(" ", result.Issues.Select(x => x.Message))}");
+            if (!result.IsValid && document.SchemaVersion != 1)
+                throw new InvalidDataException($"Profile '{profile.Name}' is invalid: {string.Join(" ", result.Issues.Select(x => x.Message))}");
         }
-        return document.Profiles;
+        return profiles;
     }
 
     public async Task SaveAsync(IReadOnlyCollection<ShawzinKeybindProfile> profiles, CancellationToken cancellationToken = default)
@@ -45,10 +48,18 @@ public sealed class JsonKeybindProfileStore(IAppPathProvider paths, IKeybindProf
         try
         {
             await using (var stream = File.Create(temporary))
-                await JsonSerializer.SerializeAsync(stream, new Document(1, profiles.ToArray()), Options, cancellationToken).ConfigureAwait(false);
+                await JsonSerializer.SerializeAsync(stream, new Document(CurrentSchemaVersion, profiles.ToArray()), Options, cancellationToken).ConfigureAwait(false);
             File.Move(temporary, paths.GameBridgeProfilesFilePath, true);
         }
         finally { File.Delete(temporary); }
+    }
+
+    private static ShawzinKeybindProfile AddScaleSelect(ShawzinKeybindProfile profile)
+    {
+        if (profile.Bindings.ContainsKey(ShawzinInputBinding.ScaleSelect)) return profile;
+        var bindings = profile.Bindings.ToDictionary(value => value.Key, value => value.Value);
+        bindings[ShawzinInputBinding.ScaleSelect] = "Tab";
+        return profile with { Bindings = bindings };
     }
 }
 

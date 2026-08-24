@@ -48,7 +48,7 @@ public sealed class ShawzinReleaseValidationTests
         Assert.Equal(12, sequence.Positions.Count);
         Assert.Equal(Enumerable.Range(60, 12), sequence.Positions.Select(value => value.Pitch));
         Assert.Equal("BCEJKMRSUhik", string.Concat(sequence.Positions.Select(value => value.CodeSymbol)));
-        Assert.StartsWith("3", sequence.SongCode);
+        Assert.Equal("3BAACAIEAQJAYKAgMAoRAwSA4UBAhBIiBQkBY", sequence.SongCode);
         Assert.Equal(12, decoder.Decode(sequence.SongCode).Song!.Track.ShawzinEvents.Count);
     }
 }

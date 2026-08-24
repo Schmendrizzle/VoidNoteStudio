@@ -77,3 +77,9 @@ Die physische Eventstruktur wird zentral in eine `ShawzinInputAction` übersetzt
 Milestone F ergänzt `ShawzinEnsemble` und `ShawzinEnsembleTrack` im Shawzin-Modul. Alle Mitglieder teilen dieselbe Master-Timeline, behalten aber eigene Instrumente, Skalen, Transpositionen, Compatibility Reports, Arrangement Reports, physische `ShawzinTrack`-Ergebnisse sowie Active-/Mute-/Solo-Zustände. Jeder Track bleibt dadurch einzeln analysierbar, arrangierbar, vorhörbar, codierbar und an die unveränderte GameBridge übergebbar.
 
 Die Ensemble-Vorschau mischt ausschließlich synthetisch erzeugte Töne. Ein leichtes deterministisches Panorama und eine kleine Klangfarbenvariation aus dem `ShawzinSoundProfile` verbessern die Unterscheidbarkeit; Warframe-Audiodateien werden weder eingebettet noch extrahiert.
+
+## Feste und dynamische Skalen
+
+Ein klassischer Warframe-Songcode enthält genau ein Skalenzeichen am Anfang. Er kann keine späteren Skalenwechsel ausdrücken. VoidNote behandelt deshalb einen `ShawzinSong` weiterhin als festen **Share Code Mode** und reicht `ShawzinScaleChangeEvent` niemals an den bestehenden Encoder weiter.
+
+**Dynamic Ingame Mode** ist ein separates erweitertes Arrangement für GameBridge-/Live-Wiedergabe. `DynamicShawzinScalePlan` enthält skalengebundene Noten, stabile Abschnitte und explizite Wechselereignisse. `IDynamicShawzinPreviewRenderer` rekonstruiert jede physische Eingabe mit der Skala des jeweiligen Abschnitts. Damit bleibt die Vorschau das erwartete Ingame-Ergebnis. Einzelheiten stehen in [dynamic-scale-playback.md](dynamic-scale-playback.md).

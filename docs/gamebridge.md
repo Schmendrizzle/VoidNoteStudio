@@ -32,13 +32,15 @@ Unter Wayland gibt es absichtlich keinen globalen synthetischen Input-Workaround
 
 ## Keybind-Profile und Validierung
 
-Profile besitzen stabile ID, Name und Bindungen für String 1–3, Fret Left/Middle/Right sowie optional Neutral. Das mitgelieferte Profil heißt ausdrücklich „Default Warframe layout“; es ist nur ein bearbeitbarer Ausgangspunkt. Profile können geladen, gespeichert, dupliziert, aktualisiert und gelöscht werden. Die Datei `gamebridge-profiles.json` ist lokal, versioniert und wird atomar ersetzt.
+Profile besitzen stabile ID, Name und Bindungen für String 1–3, Fret Left/Middle/Right, **Scale Select** sowie optional Neutral. Das mitgelieferte Profil bindet Scale Select an `Tab`; alle Bindungen bleiben bearbeitbar und werden niemals im Playbackcode fest verdrahtet. Profile können geladen, gespeichert, dupliziert, aktualisiert und gelöscht werden. Die Datei `gamebridge-profiles.json` ist lokal, versioniert, migriert ältere Profile um das neue Binding und wird atomar ersetzt.
 
 Vor Playback werden Profilname, ID, alle Pflichtbindungen, unterstützte portable Tastennamen und Konflikte geprüft. Es gibt keine stillen Ersatzbelegungen. Derselbe Key darf nicht zwei gleichzeitig benötigte Aktionen repräsentieren.
 
 ## Timing
 
 Sichere Defaults sind `KeyDownLead = 5 ms`, `HoldDuration = 25 ms` und `ReleaseDelay = 5 ms`. Sie liegen zentral in `GameBridgeTimingOptions` beziehungsweise den globalen Settings. Der bestehende Shawzin-Scheduler berechnet jedes Event weiterhin unabhängig gegen den ursprünglichen absoluten Anker. Hold-/Release-Verarbeitung erzeugt deshalb keine fortlaufend addierte Sleep-Zeit; bei Überlastung erscheint die Abweichung in den lokalen Diagnosen.
+
+Dynamic Scale verwendet zusätzlich `ScaleKeyPressDuration = 35 ms`, `ScaleKeyReleaseDelay = 25 ms` und `MinimumGapBeforeNextNote = 50 ms`. Der Planner reserviert die gesamte Wechselzeit vor der nächsten Note. Reicht die Pause nicht, erzeugt er kein riskantes Event, sondern behält die aktuelle Skala beziehungsweise ein alternatives Mapping. Scale- und Notenevents bleiben absolute Ziele desselben Scheduler-Ankers.
 
 ## Arm/Disarm, Fokus und Stop
 
@@ -49,6 +51,8 @@ Standardmäßig muss der konfigurierte Zielfenstertitel im Vordergrund sein. Ist
 ## Diagnostic Mode und Dry Run
 
 `DiagnosticGameInputBridge` sendet niemals reale Eingaben. Es protokolliert Taste, KeyDown/KeyUp, lokalen Timestamp und Event-ID. Dry Run validiert das Profil und führt denselben Mapping-/Playbackpfad gegen diese Bridge aus. Ergebnisdaten umfassen Eventzahl, Inputzahl, Mappingfehler, ungeklärte Bindungen, geplante Zeit, tatsächliche Dispatch-Zeit, Abweichung, abgebrochene Events, Fokusverluste und Emergency Stops. Es gibt keine Telemetrie und keinen Upload.
+
+Bei Dynamic Playback enthält der Dry Run zusätzlich Quell-/Zielskala, Abschnitt, Grund und Benefit Score jedes Wechsels, Timing-Sicherheit sowie einzelne und gesamte TAB-Presses. Vor realem Start zeigt VoidNote `Set your Shawzin to: <Start Scale>`. Die GameBridge liest den Spielzustand nicht und erkennt die aktuelle Skala nicht automatisch; der Benutzer muss die angezeigte Initialskala selbst einstellen.
 
 ## Fehler und Shutdown
 

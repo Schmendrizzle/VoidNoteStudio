@@ -6,6 +6,7 @@ using VoidNote.Shawzin.Analysis;
 using VoidNote.Shawzin.Arrangement;
 using VoidNote.Shawzin.Codec;
 using VoidNote.Shawzin.Preview;
+using VoidNote.Shawzin.Dynamic;
 
 namespace VoidNote.Application.Shawzin;
 
@@ -15,12 +16,20 @@ public sealed record ShawzinStudioImport(ProjectTimeline Timeline, IReadOnlyList
 public sealed record ShawzinStudioAnalysis(
     ShawzinCompatibilityReport Compatibility,
     IReadOnlyList<ShawzinScaleCandidate> ScaleCandidates,
-    IReadOnlyList<ShawzinTranspositionCandidate> TranspositionCandidates);
+    IReadOnlyList<ShawzinTranspositionCandidate> TranspositionCandidates)
+{
+    public DynamicShawzinScalePlan? DynamicRecommendation { get; init; }
+}
 /// <summary>Contains arrangement, encoding and preview results for the UI.</summary>
 public sealed record ShawzinStudioArrangement(
     ShawzinArrangementResult Arrangement,
     ShawzinEncodeResult? Encoding,
     ShawzinPreviewAudio? Preview);
+/// <summary>Contains a GameBridge-only dynamic plan plus an explicitly lower-quality fixed fallback code.</summary>
+public sealed record ShawzinStudioDynamicArrangement(
+    DynamicShawzinScalePlan Plan,
+    ShawzinEncodeResult FixedFallbackEncoding,
+    ShawzinPreviewAudio Preview);
 
 /// <summary>Defines the application-level MIDI-to-Shawzin workflow.</summary>
 public interface IShawzinStudioWorkflow
@@ -29,6 +38,8 @@ public interface IShawzinStudioWorkflow
     Task<ShawzinStudioImport> ImportMidiAsync(Stream source, CancellationToken cancellationToken = default);
     ShawzinStudioAnalysis Analyze(MidiTrack track, ProjectTimeline timeline, ShawzinDefinition instrument, ShawzinScale scale);
     ShawzinStudioArrangement Arrange(MidiTrack track, ProjectTimeline timeline, ShawzinDefinition instrument, ArrangementOptions options);
+    ShawzinStudioDynamicArrangement PlanDynamic(MidiTrack track, ProjectTimeline timeline, ShawzinDefinition instrument,
+        IReadOnlyCollection<ShawzinScale> allowedScales, DynamicShawzinScalePlanningSettings settings);
 }
 
 /// <summary>Coordinates the normalized MIDI-to-Shawzin studio flow outside the UI.</summary>
@@ -39,7 +50,9 @@ public sealed class ShawzinStudioWorkflow(
     IShawzinTranspositionAnalyzer transpositionAnalyzer,
     IShawzinArranger arranger,
     IShawzinCodeEncoder encoder,
-    IShawzinPreviewRenderer previewRenderer) : IShawzinStudioWorkflow
+    IShawzinPreviewRenderer previewRenderer,
+    IDynamicShawzinScalePlanner dynamicPlanner,
+    IDynamicShawzinPreviewRenderer dynamicPreviewRenderer) : IShawzinStudioWorkflow
 {
     public async Task<ShawzinStudioImport> ImportMidiFileAsync(string path, CancellationToken cancellationToken = default)
     {
@@ -54,11 +67,14 @@ public sealed class ShawzinStudioWorkflow(
         return new ShawzinStudioImport(result.Timeline, result.Tracks);
     }
 
-    public ShawzinStudioAnalysis Analyze(MidiTrack track, ProjectTimeline timeline, ShawzinDefinition instrument, ShawzinScale scale) =>
-        new(
+    public ShawzinStudioAnalysis Analyze(MidiTrack track, ProjectTimeline timeline, ShawzinDefinition instrument, ShawzinScale scale)
+    {
+        var dynamic = dynamicPlanner.Plan(track, timeline, instrument, instrument.Scales.Keys.ToArray(), new());
+        return new(
             compatibilityAnalyzer.Analyze(track, timeline, instrument, scale),
             scaleAnalyzer.Analyze(track, instrument),
-            transpositionAnalyzer.Analyze(track, timeline, instrument, scale));
+            transpositionAnalyzer.Analyze(track, timeline, instrument, scale)) { DynamicRecommendation = dynamic };
+    }
 
     public ShawzinStudioArrangement Arrange(MidiTrack track, ProjectTimeline timeline, ShawzinDefinition instrument, ArrangementOptions options)
     {
@@ -67,5 +83,14 @@ public sealed class ShawzinStudioWorkflow(
         var encoding = encoder.Encode(new ShawzinSong(result.Track));
         var preview = previewRenderer.Render(result.Track, instrument);
         return new ShawzinStudioArrangement(result, encoding, preview);
+    }
+
+    public ShawzinStudioDynamicArrangement PlanDynamic(MidiTrack track, ProjectTimeline timeline, ShawzinDefinition instrument,
+        IReadOnlyCollection<ShawzinScale> allowedScales, DynamicShawzinScalePlanningSettings settings)
+    {
+        var plan = dynamicPlanner.Plan(track, timeline, instrument, allowedScales, settings);
+        var fallback = encoder.Encode(new ShawzinSong(plan.FixedScaleFallback));
+        if (!fallback.IsSuccess) throw new InvalidOperationException("The fixed-scale fallback could not be encoded.");
+        return new(plan, fallback, dynamicPreviewRenderer.Render(plan, instrument));
     }
 }

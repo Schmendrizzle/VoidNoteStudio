@@ -2,7 +2,7 @@ using VoidNote.GameBridge.Abstractions;
 
 namespace VoidNote.GameBridge.Profiles;
 
-public enum ShawzinInputBinding { String1, String2, String3, FretLeft, FretMiddle, FretRight, Neutral }
+public enum ShawzinInputBinding { String1, String2, String3, FretLeft, FretMiddle, FretRight, ScaleSelect, Neutral }
 
 /// <summary>A named, persistable set of user-owned Shawzin keyboard bindings.</summary>
 public sealed record ShawzinKeybindProfile
@@ -22,6 +22,7 @@ public sealed record ShawzinKeybindProfile
         {
             [ShawzinInputBinding.String1] = "1", [ShawzinInputBinding.String2] = "2", [ShawzinInputBinding.String3] = "3",
             [ShawzinInputBinding.FretLeft] = "Left", [ShawzinInputBinding.FretMiddle] = "Down", [ShawzinInputBinding.FretRight] = "Right",
+            [ShawzinInputBinding.ScaleSelect] = "Tab",
         },
     };
 
@@ -41,7 +42,7 @@ public sealed class KeybindProfileValidator : IKeybindProfileValidator
     private static readonly HashSet<string> ValidNames = BuildValidNames();
     private static readonly ShawzinInputBinding[] Required =
     [ShawzinInputBinding.String1, ShawzinInputBinding.String2, ShawzinInputBinding.String3,
-     ShawzinInputBinding.FretLeft, ShawzinInputBinding.FretMiddle, ShawzinInputBinding.FretRight];
+     ShawzinInputBinding.FretLeft, ShawzinInputBinding.FretMiddle, ShawzinInputBinding.FretRight, ShawzinInputBinding.ScaleSelect];
 
     public KeybindValidationResult Validate(ShawzinKeybindProfile profile)
     {

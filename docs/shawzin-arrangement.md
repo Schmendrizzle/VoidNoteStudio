@@ -106,3 +106,11 @@ Die bisherige `PreserveMelody`-Reduktion im Einzeltrack-Arranger bleibt kompatib
 - Melody- und Bass-Erkennung bleiben deterministische Heuristiken und keine AI- oder Partitursemantik.
 - Arpeggiation verteilt nur vorwärts und erzeugt keine rhythmische Neuinterpretation.
 - Manuelle Reassignment-Datenoperationen sind vorhanden; eine grafische Piano-Roll-Zuordnung bleibt späterer UI-Arbeit vorbehalten.
+
+## Dynamic Scale Planner
+
+`IDynamicShawzinScalePlanner` arbeitet nicht noteweise mit spontanen Wechseln. Er bildet Phrasen an Pausen, arrangiert jeden Abschnitt gegen jede erlaubte Skala und vergleicht exakte Pitches, Substitutionen, Oktavwechsel, Drops, mittleren Pitchfehler, Kontur und Musical Similarity. Eine deterministische dynamische Programmierung sucht anschließend den besten Pfad durch diese Abschnittskandidaten.
+
+Ein Wechsel erhält `ScaleChangeCost + TabPressCount × ScaleKeyPressCost`. Er ist nur zulässig, wenn der folgende Abschnitt Mindestdauer und Mindestnotenzahl erfüllt, sein Qualitätsgewinn den `ImprovementThreshold` erreicht, genügend Pitchfehler oder Substitutionen verhindert werden und die Pause alle erforderlichen Key-Down-/Release-Zeiten plus Sicherheitsabstand enthält. Bringt der komplette dynamische Pfad gegenüber der besten festen Skala nur einen vernachlässigbaren Gewinn, liefert der Planner absichtlich einen festen Share-Code-kompatiblen Plan.
+
+UI und Report stellen beste feste Skala und besten dynamischen Plan nebeneinander dar. Der feste Fallback bleibt exportierbar; im Modus **Dynamic Scale Playback – GameBridge only** ist **Copy classic code** deaktiviert, damit der Fallback nicht als musikalisch gleichwertiger Dynamic-Code missverstanden wird.

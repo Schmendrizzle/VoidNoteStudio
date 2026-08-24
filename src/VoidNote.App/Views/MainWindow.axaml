@@ -116,6 +116,10 @@
           </ComboBox>
           <TextBlock Text="{DynamicResource Scale}" FontWeight="SemiBold" />
           <ComboBox ItemsSource="{Binding Scales}" SelectedItem="{Binding SelectedScale}" />
+          <TextBlock Text="{DynamicResource PlaybackMode}" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{Binding PlaybackModes}" SelectedItem="{Binding PlaybackMode}" />
+          <TextBlock Text="{Binding PlaybackModeDescription}" TextWrapping="Wrap" Opacity="0.75" />
+          <CheckBox Content="{DynamicResource OverrideStartScale}" IsChecked="{Binding OverrideDynamicStartScale}" />
           <TextBlock Text="{DynamicResource ArrangementStrategy}" FontWeight="SemiBold" />
           <ComboBox ItemsSource="{Binding Strategies}" SelectedItem="{Binding SelectedStrategy}">
             <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:StrategyChoice"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
@@ -141,9 +145,14 @@
           <Border Padding="16" CornerRadius="8" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
             <TextBlock Text="{Binding Compatibility}" TextWrapping="Wrap" />
           </Border>
+          <TextBlock Text="{DynamicResource DynamicComparison}" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding DynamicComparison}" TextWrapping="Wrap" />
+          <Expander Header="{DynamicResource DynamicPlan}">
+            <TextBox Text="{Binding DynamicPlanDetails}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="260" />
+          </Expander>
           <TextBlock Text="{DynamicResource GeneratedCode}" FontSize="20" FontWeight="SemiBold" />
           <TextBox Text="{Binding SongCode}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="180" />
-          <Button Content="{DynamicResource CopyCode}" HorizontalAlignment="Left" Click="CopyCode_Click" />
+          <Button Content="{DynamicResource CopyCode}" IsEnabled="{Binding CanCopyClassicCode}" HorizontalAlignment="Left" Click="CopyCode_Click" />
           <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Opacity="0.75" />
           <Expander Header="{DynamicResource ValidationTool}">
             <StackPanel Spacing="8">
@@ -199,13 +208,14 @@
                 <ComboBox.ItemTemplate><DataTemplate x:DataType="profiles:ShawzinKeybindProfile"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
               </ComboBox>
               <TextBox PlaceholderText="{DynamicResource ProfileName}" Text="{Binding ProfileName}" />
-              <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+              <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="6">
                 <TextBlock Text="{DynamicResource String1}" VerticalAlignment="Center" /><TextBox Grid.Column="1" Text="{Binding String1Key}" />
                 <TextBlock Grid.Column="2" Text="{DynamicResource FretLeft}" VerticalAlignment="Center" /><TextBox Grid.Column="3" Text="{Binding FretLeftKey}" />
                 <TextBlock Grid.Row="1" Text="{DynamicResource String2}" VerticalAlignment="Center" /><TextBox Grid.Row="1" Grid.Column="1" Text="{Binding String2Key}" />
                 <TextBlock Grid.Row="1" Grid.Column="2" Text="{DynamicResource FretMiddle}" VerticalAlignment="Center" /><TextBox Grid.Row="1" Grid.Column="3" Text="{Binding FretMiddleKey}" />
                 <TextBlock Grid.Row="2" Text="{DynamicResource String3}" VerticalAlignment="Center" /><TextBox Grid.Row="2" Grid.Column="1" Text="{Binding String3Key}" />
                 <TextBlock Grid.Row="2" Grid.Column="2" Text="{DynamicResource FretRight}" VerticalAlignment="Center" /><TextBox Grid.Row="2" Grid.Column="3" Text="{Binding FretRightKey}" />
+                <TextBlock Grid.Row="3" Text="{DynamicResource ScaleSelect}" VerticalAlignment="Center" /><TextBox Grid.Row="3" Grid.Column="1" Text="{Binding ScaleSelectKey}" />
               </Grid>
               <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                 <Button Content="{DynamicResource SaveProfile}" Click="SaveProfile_Click" />

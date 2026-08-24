@@ -136,6 +136,9 @@ public sealed record GameBridgeSettings
     public int KeyDownLeadMilliseconds { get; init; } = 5;
     public int HoldDurationMilliseconds { get; init; } = 25;
     public int ReleaseDelayMilliseconds { get; init; } = 5;
+    public int ScaleKeyPressDurationMilliseconds { get; init; } = 35;
+    public int ScaleKeyReleaseDelayMilliseconds { get; init; } = 25;
+    public int MinimumGapBeforeNextNoteMilliseconds { get; init; } = 50;
 }
 
 /// <summary>Controls whether loss of the configured target focus aborts real input.</summary>

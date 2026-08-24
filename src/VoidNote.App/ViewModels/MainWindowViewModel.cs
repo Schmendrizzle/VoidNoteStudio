@@ -16,6 +16,7 @@ using VoidNote.Application.Jobs;
 using VoidNote.Application.Projects;
 using VoidNote.Application.Commands;
 using System.Reflection;
+using VoidNote.Shawzin.Dynamic;
 
 namespace VoidNote.App.ViewModels;
 
@@ -51,6 +52,12 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     private string _fretLeftKey = string.Empty;
     private string _fretMiddleKey = string.Empty;
     private string _fretRightKey = string.Empty;
+    private string _scaleSelectKey = string.Empty;
+    private ShawzinArrangementMode _playbackMode = ShawzinArrangementMode.ShareCode;
+    private bool _overrideDynamicStartScale;
+    private DynamicShawzinScalePlan? _dynamicPlan;
+    private string _dynamicComparison = "Analyze a MIDI track to compare fixed and dynamic scale planning.";
+    private string _dynamicPlanDetails = string.Empty;
     private int _shawzinCount = 2;
     private MultiShawzinSplitStrategy _splitStrategy = MultiShawzinSplitStrategy.FullEnsemble;
     private IReadOnlyList<EnsembleTrackViewModel> _ensembleTracks = [];
@@ -82,6 +89,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     public IReadOnlyList<MidiTrack> Tracks { get; private set; } = [];
     public IReadOnlyList<ShawzinDefinition> Instruments => BuiltInShawzinDefinitions.All;
     public IReadOnlyList<ShawzinScale> Scales { get; } = Enum.GetValues<ShawzinScale>();
+    public IReadOnlyList<ShawzinArrangementMode> PlaybackModes { get; } = Enum.GetValues<ShawzinArrangementMode>();
     public IReadOnlyList<StrategyChoice> Strategies => StrategyChoice.All;
     public IReadOnlyList<int> ShawzinCounts { get; } = [2, 3, 4];
     public IReadOnlyList<MultiShawzinSplitStrategy> SplitStrategies { get; } = Enum.GetValues<MultiShawzinSplitStrategy>();
@@ -147,10 +155,27 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     public MidiTrack? SelectedTrack { get => _selectedTrack; set => Set(ref _selectedTrack, value); }
     public ShawzinDefinition SelectedInstrument { get => _selectedInstrument; set => Set(ref _selectedInstrument, value); }
     public ShawzinScale SelectedScale { get => _selectedScale; set => Set(ref _selectedScale, value); }
+    public ShawzinArrangementMode PlaybackMode
+    {
+        get => _playbackMode;
+        set
+        {
+            if (!Set(ref _playbackMode, value)) return;
+            OnPropertyChanged(nameof(CanCopyClassicCode));
+            OnPropertyChanged(nameof(PlaybackModeDescription));
+        }
+    }
+    public bool OverrideDynamicStartScale { get => _overrideDynamicStartScale; set => Set(ref _overrideDynamicStartScale, value); }
+    public string PlaybackModeDescription => PlaybackMode == ShawzinArrangementMode.ShareCode
+        ? "Share Code Mode · one scale · classic Warframe song code"
+        : "Dynamic Scale Playback · GameBridge only · no compatible share code";
+    public string DynamicComparison { get => _dynamicComparison; private set => Set(ref _dynamicComparison, value); }
+    public string DynamicPlanDetails { get => _dynamicPlanDetails; private set => Set(ref _dynamicPlanDetails, value); }
+    public bool CanCopyClassicCode => PlaybackMode == ShawzinArrangementMode.ShareCode && !string.IsNullOrWhiteSpace(SongCode);
     public StrategyChoice SelectedStrategy { get => _selectedStrategy; set => Set(ref _selectedStrategy, value); }
     public string Status { get => _status; private set => Set(ref _status, value); }
     public string Compatibility { get => _compatibility; private set => Set(ref _compatibility, value); }
-    public string SongCode { get => _songCode; private set => Set(ref _songCode, value); }
+    public string SongCode { get => _songCode; private set { if (Set(ref _songCode, value)) OnPropertyChanged(nameof(CanCopyClassicCode)); } }
     public bool HasPreview => _previewWave is { Length: > 44 };
     public IReadOnlyList<ShawzinKeybindProfile> KeybindProfiles { get => _keybindProfiles; private set { _keybindProfiles = value; OnPropertyChanged(); } }
     public ShawzinKeybindProfile? SelectedKeybindProfile
@@ -165,6 +190,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     public string FretLeftKey { get => _fretLeftKey; set => Set(ref _fretLeftKey, value); }
     public string FretMiddleKey { get => _fretMiddleKey; set => Set(ref _fretMiddleKey, value); }
     public string FretRightKey { get => _fretRightKey; set => Set(ref _fretRightKey, value); }
+    public string ScaleSelectKey { get => _scaleSelectKey; set => Set(ref _scaleSelectKey, value); }
     public string GameBridgeAvailability => $"{(gameBridge.Capability.IsAvailable ? "Yes" : "No")} · {gameBridge.Capability.Backend}: {gameBridge.Capability.Description}";
     public string GameBridgeStatus { get => _gameBridgeStatus; private set => Set(ref _gameBridgeStatus, value); }
     public bool IsGameBridgeArmed => gameBridge.ArmState == VoidNote.GameBridge.Safety.GameBridgeArmState.Armed;
@@ -346,12 +372,41 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         var analysis = _workflow.Analyze(SelectedTrack, _timeline, SelectedInstrument, SelectedScale);
         var report = analysis.Compatibility;
         Compatibility = $"Playable {report.OverallScore}% · direct {report.DirectlyPlayablePercent}% · octave {report.OctaveFixablePercent}% · substitutions {report.PitchSubstitutionNotes} · expected change {report.ExpectedChangeRatePercent}% · mean pitch error {report.MeanPitchErrorSemitones:0.##} st · conflicts {report.TimingConflicts + report.PolyphonyConflicts + report.ChordConflicts}";
-        Status = $"Best scale: {analysis.ScaleCandidates[0].DisplayName}; best transposition: {analysis.TranspositionCandidates[0].Semitones:+#;-#;0}.";
+        _dynamicPlan = analysis.DynamicRecommendation;
+        if (_dynamicPlan is not null)
+        {
+            DynamicComparison = FormatComparison(_dynamicPlan);
+            DynamicPlanDetails = FormatPlan(_dynamicPlan);
+        }
+        Status = $"Best fixed scale: {analysis.ScaleCandidates[0].DisplayName}; best transposition: {analysis.TranspositionCandidates[0].Semitones:+#;-#;0}. " +
+            (_dynamicPlan is null ? string.Empty : $"Best dynamic start: {_dynamicPlan.RequiredInitialScale}.");
     }
 
     public void Arrange()
     {
         if (SelectedTrack is null || _timeline is null) { Status = "Select a MIDI track first."; return; }
+        if (PlaybackMode == ShawzinArrangementMode.DynamicIngame)
+        {
+            var dynamicResult = _workflow.PlanDynamic(SelectedTrack, _timeline, SelectedInstrument, SelectedInstrument.Scales.Keys.ToArray(),
+                new DynamicShawzinScalePlanningSettings
+                {
+                    InitialScale = OverrideDynamicStartScale ? SelectedScale : null,
+                    ScaleKeyPressDurationSeconds = _settings.GameBridge.ScaleKeyPressDurationMilliseconds / 1000m,
+                    ScaleKeyReleaseDelaySeconds = _settings.GameBridge.ScaleKeyReleaseDelayMilliseconds / 1000m,
+                    MinimumGapBeforeNextNoteSeconds = _settings.GameBridge.MinimumGapBeforeNextNoteMilliseconds / 1000m,
+                });
+            _dynamicPlan = dynamicResult.Plan;
+            _previewWave = dynamicResult.Preview.WaveData;
+            _arrangedTrack = dynamicResult.Plan.FixedScaleFallback;
+            SongCode = dynamicResult.FixedFallbackEncoding.Code ?? string.Empty;
+            DynamicComparison = FormatComparison(dynamicResult.Plan);
+            DynamicPlanDetails = FormatPlan(dynamicResult.Plan);
+            OnPropertyChanged(nameof(HasPreview));
+            Status = dynamicResult.Plan.Mode == ShawzinArrangementMode.DynamicIngame
+                ? $"Dynamic Scale Playback – GameBridge only. Set your Shawzin to {dynamicResult.Plan.RequiredInitialScale}. The displayed code is a fixed {dynamicResult.Plan.FixedScale} fallback with {dynamicResult.Plan.FixedScaleMetrics.MusicalSimilarityPercent}% similarity; Copy Code is disabled in Dynamic mode."
+                : $"Dynamic planning found negligible benefit. Fixed {dynamicResult.Plan.FixedScale} is preferred and remains share-code compatible.";
+            return;
+        }
         var result = _workflow.Arrange(SelectedTrack, _timeline, SelectedInstrument, new ArrangementOptions
         {
             Scale = SelectedScale,
@@ -360,6 +415,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         SongCode = result.Encoding?.Code ?? string.Empty;
         _previewWave = result.Preview?.WaveData;
         _arrangedTrack = result.Arrangement.Track;
+        _dynamicPlan = null;
         if (_arrangedTrack is not null)
         {
             _project.ShawzinTracks.RemoveAll(value => value.Id == _arrangedTrack.Id);
@@ -460,9 +516,13 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         try
         {
             GameBridgeStatus = "Playing…";
-            await gameBridge.PlayAsync(_arrangedTrack, SelectedKeybindProfile,
-                new(TimeSpan.FromMilliseconds(value.KeyDownLeadMilliseconds), TimeSpan.FromMilliseconds(value.HoldDurationMilliseconds), TimeSpan.FromMilliseconds(value.ReleaseDelayMilliseconds)),
-                value.TargetWindowTitle, value.FocusLossBehavior == TargetFocusLossBehavior.Abort, token);
+            var timing = Timing(value);
+            if (PlaybackMode == ShawzinArrangementMode.DynamicIngame && _dynamicPlan is not null)
+                await gameBridge.PlayDynamicAsync(_dynamicPlan, SelectedKeybindProfile, timing,
+                    value.TargetWindowTitle, value.FocusLossBehavior == TargetFocusLossBehavior.Abort, token);
+            else
+                await gameBridge.PlayAsync(_arrangedTrack, SelectedKeybindProfile, timing,
+                    value.TargetWindowTitle, value.FocusLossBehavior == TargetFocusLossBehavior.Abort, token);
             GameBridgeStatus = FormatDiagnostics("Completed", gameBridge.LastDiagnostics);
         }
         catch (Exception exception) { logger.LogError(exception, "GameBridge playback failed and was stopped."); GameBridgeStatus = $"Stopped and disarmed: {exception.Message}"; }
@@ -472,7 +532,9 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     public async Task DryRunAsync(CancellationToken token = default)
     {
         if (_arrangedTrack is null || SelectedKeybindProfile is null) { GameBridgeStatus = "Arrange a valid track and select a keybind profile first."; return; }
-        var result = await gameBridge.DryRunAsync(_arrangedTrack, SelectedKeybindProfile, token: token);
+        var result = PlaybackMode == ShawzinArrangementMode.DynamicIngame && _dynamicPlan is not null
+            ? await gameBridge.DryRunDynamicAsync(_dynamicPlan, SelectedKeybindProfile, Timing(_settings.GameBridge), token)
+            : await gameBridge.DryRunAsync(_arrangedTrack, SelectedKeybindProfile, token: token);
         GameBridgeStatus = result.MappingErrors.Count > 0 ? string.Join(" ", result.MappingErrors) : FormatDiagnostics($"Dry run: {result.EventCount} events, {result.InputCount} transitions", result.Diagnostics);
     }
 
@@ -485,7 +547,13 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     }
 
     public async Task EmergencyStopAsync() { await gameBridge.EmergencyStopAsync(); GameBridgeStatus = "EMERGENCY STOP · all keys released · DISARMED"; OnPropertyChanged(nameof(IsGameBridgeArmed)); }
-    private static string FormatDiagnostics(string prefix, PlaybackDiagnostics? diagnostics) => diagnostics is null ? prefix : $"{prefix} · inputs {diagnostics.InputCount} · aborted {diagnostics.AbortedEvents} · focus losses {diagnostics.FocusLosses} · emergency stops {diagnostics.EmergencyStops}";
+    private static string FormatDiagnostics(string prefix, PlaybackDiagnostics? diagnostics)
+    {
+        if (diagnostics is null) return prefix;
+        var scaleChanges = diagnostics.ScaleChanges.Count == 0 ? string.Empty : Environment.NewLine + string.Join(Environment.NewLine,
+            diagnostics.ScaleChanges.Select(value => $"{value.PlannedTime.Seconds:00.000} {value.SourceScale} → {value.TargetScale} ({value.TabPressCount} TAB presses) · {value.Reason} · benefit {value.BenefitScore:0.##} · timing safe {value.TimingSafe}"));
+        return $"{prefix} · inputs {diagnostics.InputCount} · scale changes {diagnostics.ScaleChanges.Count} · TAB presses {diagnostics.TotalScaleKeyPresses} · aborted {diagnostics.AbortedEvents} · focus losses {diagnostics.FocusLosses} · emergency stops {diagnostics.EmergencyStops}{scaleChanges}";
+    }
 
     public async Task SavePreviewAsync(string path, CancellationToken cancellationToken = default)
     {
@@ -498,6 +566,7 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
     {
         [ShawzinInputBinding.String1] = String1Key, [ShawzinInputBinding.String2] = String2Key, [ShawzinInputBinding.String3] = String3Key,
         [ShawzinInputBinding.FretLeft] = FretLeftKey, [ShawzinInputBinding.FretMiddle] = FretMiddleKey, [ShawzinInputBinding.FretRight] = FretRightKey,
+        [ShawzinInputBinding.ScaleSelect] = ScaleSelectKey,
     };
 
     private void LoadProfileEditor(ShawzinKeybindProfile? profile)
@@ -505,8 +574,32 @@ public sealed class MainWindowViewModel(IShawzinStudioWorkflow workflow, IMultiS
         ProfileName = profile?.Name ?? string.Empty;
         String1Key = Get(profile, ShawzinInputBinding.String1); String2Key = Get(profile, ShawzinInputBinding.String2); String3Key = Get(profile, ShawzinInputBinding.String3);
         FretLeftKey = Get(profile, ShawzinInputBinding.FretLeft); FretMiddleKey = Get(profile, ShawzinInputBinding.FretMiddle); FretRightKey = Get(profile, ShawzinInputBinding.FretRight);
+        ScaleSelectKey = Get(profile, ShawzinInputBinding.ScaleSelect);
     }
     private static string Get(ShawzinKeybindProfile? profile, ShawzinInputBinding binding) => profile is not null && profile.Bindings.TryGetValue(binding, out var key) ? key : string.Empty;
+
+    private static GameBridgeTimingOptions Timing(GameBridgeSettings settings) =>
+        new(TimeSpan.FromMilliseconds(settings.KeyDownLeadMilliseconds), TimeSpan.FromMilliseconds(settings.HoldDurationMilliseconds),
+            TimeSpan.FromMilliseconds(settings.ReleaseDelayMilliseconds))
+        {
+            ScaleKeyPressDuration = TimeSpan.FromMilliseconds(settings.ScaleKeyPressDurationMilliseconds),
+            ScaleKeyReleaseDelay = TimeSpan.FromMilliseconds(settings.ScaleKeyReleaseDelayMilliseconds),
+            MinimumGapBeforeNextNote = TimeSpan.FromMilliseconds(settings.MinimumGapBeforeNextNoteMilliseconds),
+        };
+
+    private static string FormatComparison(DynamicShawzinScalePlan plan) =>
+        $"Best Fixed {plan.FixedScale}: playability {plan.FixedScaleMetrics.PlayabilityPercent}% · similarity {plan.FixedScaleMetrics.MusicalSimilarityPercent}% · " +
+        $"substitutions {plan.FixedScaleMetrics.PitchSubstitutionCount} · octave shifts {plan.FixedScaleMetrics.OctaveShiftCount} · mean error {plan.FixedScaleMetrics.MeanPitchErrorSemitones:0.##} st{Environment.NewLine}" +
+        $"Best Dynamic: start {plan.RequiredInitialScale} · playability {plan.Metrics.PlayabilityPercent}% · similarity {plan.Metrics.MusicalSimilarityPercent}% · " +
+        $"substitutions {plan.Metrics.PitchSubstitutionCount} · octave shifts {plan.Metrics.OctaveShiftCount} · mean error {plan.Metrics.MeanPitchErrorSemitones:0.##} st · " +
+        $"scale changes {plan.Metrics.ScaleChangeCount} · TAB presses {plan.Metrics.TotalScaleKeyPresses}";
+
+    private static string FormatPlan(DynamicShawzinScalePlan plan)
+    {
+        var sections = plan.Sections.Select(value => $"{value.Start.Seconds:00.000}–{value.End.Seconds:00.000} · section {value.Index + 1} · {value.Scale} · {value.SourceNoteCount} notes · similarity {value.SimilarityScore}%");
+        var changes = plan.ScaleChangeEvents.Select(value => $"{value.Timestamp.Seconds:00.000} {value.SourceScale} → {value.TargetScale} ({value.RequiredScaleKeyPressCount} TAB presses) · {value.Reason} · benefit {value.BenefitScore:0.##} · window {value.AvailableWindowSeconds:0.###}/{value.RequiredWindowSeconds:0.###} s · safe {value.IsTimingSafe}");
+        return $"Set your Shawzin to: {plan.RequiredInitialScale}{Environment.NewLine}" + string.Join(Environment.NewLine, sections.Concat(changes));
+    }
 
     private void SetProject(VoidNoteProject project, string? path, bool dirty)
     {
